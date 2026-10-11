@@ -1,0 +1,60 @@
+# Publica o jogo no GitHub Pages e gera as vozes neurais em português do Brasil.
+# Ative em: Settings → Pages → Build and deployment → Source: GitHub Actions.
+name: Publicar jogo
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  vozes-e-publicacao:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Exportar falas do jogo
+        run: node tools/exportar_falas.js
+
+      - name: Gerar vozes neurais pt-BR (somente as que faltam)
+        run: |
+          pip install edge-tts
+          python tools/gerar_vozes.py
+        continue-on-error: true
+
+      - name: Guardar as vozes no repositório
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898732+github-actions[bot]@users.noreply.github.com"
+          git add audio/
+          git diff --cached --quiet || git commit -m "Vozes neurais pt-BR geradas automaticamente [skip ci]"
+          git push || true
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: .
+
+      - id: deploy
+        uses: actions/deploy-pages@v4
