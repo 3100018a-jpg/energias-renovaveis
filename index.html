@@ -1,0 +1,287 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Energias Renováveis e Sustentabilidade</title>
+<meta name="description" content="Jogo educativo de construção de cidades em 2.5D sobre energias renováveis e sustentabilidade para o 9º ano de Geografia.">
+<meta name="theme-color" content="#0b2a33">
+<link rel="icon" href="assets/icone.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lilita+One&family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&display=swap">
+<link rel="stylesheet" href="css/estilo.css">
+</head>
+<body>
+<!--CORPO-->
+<canvas id="mundo" aria-label="Mapa do jogo"></canvas>
+<div id="vinheta" aria-hidden="true"></div>
+
+<!-- tela inicial -->
+<section id="tela-inicio" class="tela">
+  <div class="inicio-fundo" aria-hidden="true"></div>
+  <div class="inicio-conteudo">
+    <p class="sobretitulo">Município de Vale Esperança · Geografia · 9º ano</p>
+    <h1 class="titulo-jogo"><span>Energias Renováveis</span><span class="e">e Sustentabilidade</span></h1>
+    <p class="lema">Explore o município, converse com os moradores, vença desafios e construa uma rede de energia limpa que atenda a cidade 24 horas por dia.</p>
+    <div class="botoes-inicio">
+      <button id="bt-novo" class="bt bt-ouro bt-grande">Novo jogo</button>
+      <button id="bt-continuar" class="bt bt-verde bt-grande" hidden>Continuar</button>
+      <button id="bt-como" class="bt bt-vidro">Como jogar</button>
+      <button id="bt-config-inicio" class="bt bt-vidro">Configurações</button>
+    </div>
+    <ul class="selos">
+      <li><b>11</b> missões com mapas próprios</li>
+      <li><b>100</b> desafios com alternativas embaralhadas</li>
+      <li><b>60+</b> construções e ações</li>
+      <li>Vozes em português do Brasil</li>
+    </ul>
+  </div>
+</section>
+
+<!-- escolha de personagem -->
+<section id="tela-avatar" class="tela" hidden>
+  <div class="painel cartao-avatar">
+    <h2 class="titulo-painel">Quem vai explorar Vale Esperança?</h2>
+    <label for="campo-nome" class="rotulo">Seu nome (aparece no certificado)</label>
+    <input id="campo-nome" type="text" maxlength="28" autocomplete="off" placeholder="Digite seu nome">
+    <p class="rotulo">Escolha seu personagem</p>
+    <div id="lista-avatares" class="lista-avatares" role="radiogroup" aria-label="Personagens"></div>
+    <div class="linha-botoes">
+      <button id="bt-avatar-voltar" class="bt bt-vidro">Voltar</button>
+      <button id="bt-avatar-ok" class="bt bt-ouro">Começar a aventura</button>
+    </div>
+  </div>
+</section>
+
+<!-- HUD -->
+<header id="hud" hidden>
+  <div class="hud-local">
+    <span id="hud-icone" class="hud-icone"></span>
+    <div><strong id="hud-titulo">Vale Esperança</strong><small id="hud-sub">Mapa central</small></div>
+  </div>
+  <div class="hud-numeros">
+    <span class="chip" title="Pontos"><svg class="ico" viewBox="0 0 24 24"><path d="M12 2.5l2.9 6.2 6.8.8-5 4.7 1.3 6.8L12 17.6 6 21l1.3-6.8-5-4.7 6.8-.8Z" fill="currentColor"/></svg><b id="hud-pontos">0</b><small>pontos</small></span>
+    <span class="chip chip-credito" id="chip-creditos" title="Créditos verdes" hidden><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M8 15.5c0-5 3-7.5 8-7.5c0 5-3 7.5-8 7.5Z M8 15.5l4-4"/></svg><b id="hud-creditos">0</b><small>créditos</small></span>
+    <button class="chip chip-bt" id="bt-insignias" title="Insígnias"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 2h4l1 5 1-5h4l-3 7 M12 22a6.5 6.5 0 1 0 0-13a6.5 6.5 0 1 0 0 13Z"/></svg><b id="hud-insignias">0/11</b><small>insígnias</small></button>
+  </div>
+  <div class="hud-botoes">
+    <button id="bt-voltar-hub" class="bt-ico" title="Voltar ao mapa central" hidden></button>
+    <button id="bt-periodo" class="bt-ico" title="Período do dia: dia, entardecer, noite ou ciclo automático"></button>
+    <button id="bt-voz" class="bt-ico" title="Ligar ou desligar vozes"></button>
+    <button id="bt-tela" class="bt-ico" title="Tela cheia"></button>
+    <button id="bt-config" class="bt-ico" title="Configurações"></button>
+  </div>
+</header>
+
+<!-- painel da missão -->
+<aside id="painel-missao" class="painel" hidden>
+  <button id="bt-recolher" class="recolher" aria-expanded="true">Objetivos</button>
+  <div class="painel-corpo">
+    <h3 id="pm-nome" class="pm-nome"></h3>
+    <p id="pm-fonte" class="pm-fonte"></p>
+    <ul id="pm-objetivos" class="objetivos"></ul>
+    <div id="pm-indicadores" class="indicadores"></div>
+    <button id="bt-painel24" class="bt bt-vidro bt-peq" hidden>Ver painel das 24 horas</button>
+  </div>
+</aside>
+
+<!-- minimapa -->
+<div id="caixa-minimapa" hidden>
+  <canvas id="minimapa" width="200" height="100" aria-label="Minimapa: clique para caminhar até o ponto"></canvas>
+  <div class="zoom">
+    <button id="bt-zoom-mais" class="bt-ico peq" title="Aproximar">+</button>
+    <button id="bt-zoom-menos" class="bt-ico peq" title="Afastar">−</button>
+    <button id="bt-centralizar" class="bt-ico peq" title="Centralizar no personagem"></button>
+  </div>
+</div>
+
+<div id="dica-hover" hidden></div>
+<div id="prompt-interagir" hidden></div>
+<div id="toasts" aria-live="polite"></div>
+<div id="selo-qualidade" hidden></div>
+
+<!-- diálogo -->
+<section id="dialogo" hidden>
+  <canvas id="dlg-retrato" width="136" height="136"></canvas>
+  <div class="dlg-corpo">
+    <p class="dlg-quem"><strong id="dlg-nome"></strong><span id="dlg-papel"></span></p>
+    <p id="dlg-texto" class="dlg-texto"></p>
+    <div id="dlg-escolhas" class="dlg-escolhas"></div>
+  </div>
+  <div class="dlg-acoes">
+    <button id="dlg-ouvir" class="bt-ico" title="Ouvir novamente"></button>
+    <button id="dlg-pular" class="bt bt-vidro bt-peq">Pular</button>
+    <button id="dlg-proximo" class="bt bt-ouro bt-peq">Continuar</button>
+  </div>
+</section>
+
+<!-- modais -->
+<div id="veu" hidden></div>
+
+<section id="modal-quiz" class="modal painel" hidden role="dialog" aria-labelledby="quiz-pergunta">
+  <div class="quiz-topo">
+    <canvas id="quiz-retrato" width="96" height="96"></canvas>
+    <div>
+      <p class="eyebrow" id="quiz-eyebrow">Desafio</p>
+      <p class="quiz-quem" id="quiz-quem"></p>
+    </div>
+    <button id="quiz-ouvir" class="bt-ico" title="Ouvir a pergunta e as alternativas"></button>
+  </div>
+  <h2 id="quiz-pergunta" class="quiz-pergunta"></h2>
+  <ol id="quiz-opcoes" class="quiz-opcoes"></ol>
+  <div id="quiz-retorno" class="quiz-retorno" hidden>
+    <p id="quiz-veredito" class="veredito"></p>
+    <p id="quiz-explica"></p>
+    <button id="quiz-ok" class="bt bt-ouro">Continuar</button>
+  </div>
+</section>
+
+<section id="modal-construir" class="modal painel modal-largo" hidden role="dialog" aria-labelledby="cons-titulo">
+  <button class="fechar bt-ico" data-fechar title="Fechar"></button>
+  <p class="eyebrow">Lote para construção</p>
+  <h2 id="cons-titulo" class="titulo-painel"></h2>
+  <p id="cons-atual" class="cons-atual" hidden></p>
+  <div id="cons-opcoes" class="cons-opcoes"></div>
+</section>
+
+<section id="modal-problema" class="modal painel" hidden role="dialog" aria-labelledby="prob-titulo">
+  <button class="fechar bt-ico" data-fechar title="Fechar"></button>
+  <p class="eyebrow alerta">Problema ambiental</p>
+  <h2 id="prob-titulo" class="titulo-painel"></h2>
+  <p id="prob-desc"></p>
+  <ul id="prob-impactos" class="impactos"></ul>
+  <p id="prob-requisito" class="requisito"></p>
+  <button id="prob-acao" class="bt bt-ouro"></button>
+</section>
+
+<section id="modal-info" class="modal painel" hidden role="dialog" aria-labelledby="info-titulo">
+  <button class="fechar bt-ico" data-fechar title="Fechar"></button>
+  <p class="eyebrow">Você sabia?</p>
+  <h2 id="info-titulo" class="titulo-painel"></h2>
+  <p id="info-texto" class="texto-grande"></p>
+  <button class="bt bt-ouro" data-fechar>Entendi</button>
+</section>
+
+<section id="modal-missao" class="modal painel" hidden role="dialog" aria-labelledby="mis-titulo">
+  <button class="fechar bt-ico" data-fechar title="Fechar"></button>
+  <div class="mis-topo">
+    <div id="mis-insignia" class="mis-insignia"></div>
+    <div>
+      <p class="eyebrow" id="mis-fonte"></p>
+      <h2 id="mis-titulo" class="titulo-painel"></h2>
+      <p id="mis-narrador" class="mis-narrador"></p>
+    </div>
+  </div>
+  <p id="mis-desc"></p>
+  <p id="mis-status" class="requisito"></p>
+  <p class="rotulo">Horário da missão</p>
+  <div id="mis-periodo" class="segmentado" role="radiogroup" aria-label="Horário da missão"></div>
+  <div class="linha-botoes">
+    <button class="bt bt-vidro" data-fechar>Agora não</button>
+    <button id="mis-entrar" class="bt bt-ouro">Entrar na missão</button>
+  </div>
+</section>
+
+<section id="modal-insignias" class="modal painel modal-largo" hidden role="dialog" aria-labelledby="ins-titulo">
+  <button class="fechar bt-ico" data-fechar title="Fechar"></button>
+  <p class="eyebrow">Coleção</p>
+  <h2 id="ins-titulo" class="titulo-painel">Insígnias e conquistas</h2>
+  <div id="ins-grade" class="ins-grade"></div>
+  <h3 class="sub">Conquistas especiais</h3>
+  <div id="ins-conquistas" class="ins-grade peq"></div>
+  <div id="ins-certificado"></div>
+</section>
+
+<section id="modal-config" class="modal painel modal-largo" hidden role="dialog" aria-labelledby="cfg-titulo">
+  <button class="fechar bt-ico" data-fechar title="Fechar"></button>
+  <h2 id="cfg-titulo" class="titulo-painel">Configurações</h2>
+  <div class="cfg-grade">
+    <fieldset>
+      <legend>Qualidade gráfica</legend>
+      <div id="cfg-qualidade" class="segmentado" role="radiogroup"></div>
+      <p id="cfg-qualidade-info" class="nota"></p>
+    </fieldset>
+    <fieldset>
+      <legend>Período do dia</legend>
+      <div id="cfg-periodo" class="segmentado" role="radiogroup" aria-label="Período do dia neste mapa"></div>
+      <label class="alternar"><input type="checkbox" id="cfg-periodo-todos"> Usar em todos os mapas e missões</label>
+      <p class="nota">No ciclo automático, o dia vira entardecer e noite a cada seis minutos. À noite, janelas, postes e faróis se acendem.</p>
+    </fieldset>
+    <fieldset>
+      <legend>Vozes em português do Brasil</legend>
+      <label class="alternar"><input type="checkbox" id="cfg-voz"> Ligar vozes dos personagens</label>
+      <label class="alternar"><input type="checkbox" id="cfg-alternativas"> Ler as alternativas dos desafios</label>
+      <label for="cfg-lista-vozes" class="rotulo">Voz do navegador (usada quando não há áudio gravado)</label>
+      <select id="cfg-lista-vozes"></select>
+      <p id="cfg-voz-info" class="nota"></p>
+      <button id="cfg-testar" class="bt bt-vidro bt-peq">Testar voz</button>
+    </fieldset>
+    <fieldset>
+      <legend>Volume</legend>
+      <label class="rotulo" for="cfg-vol-voz">Vozes</label><input type="range" id="cfg-vol-voz" min="0" max="1" step="0.05">
+      <label class="rotulo" for="cfg-vol-mus">Música e ambiente</label><input type="range" id="cfg-vol-mus" min="0" max="1" step="0.05">
+      <label class="rotulo" for="cfg-vol-fx">Efeitos</label><input type="range" id="cfg-vol-fx" min="0" max="1" step="0.05">
+    </fieldset>
+    <fieldset>
+      <legend>Progresso</legend>
+      <p class="nota">O progresso fica salvo neste navegador.</p>
+      <button id="cfg-reiniciar" class="bt bt-perigo bt-peq">Apagar progresso</button>
+      <div id="cfg-confirmar" class="confirmar" hidden>
+        <p>Apagar todas as insígnias e pontos?</p>
+        <button id="cfg-sim" class="bt bt-perigo bt-peq">Sim, apagar</button>
+        <button id="cfg-nao" class="bt bt-vidro bt-peq">Cancelar</button>
+      </div>
+    </fieldset>
+  </div>
+</section>
+
+<section id="modal-como" class="modal painel modal-largo" hidden role="dialog" aria-labelledby="como-titulo">
+  <button class="fechar bt-ico" data-fechar title="Fechar"></button>
+  <h2 id="como-titulo" class="titulo-painel">Como jogar</h2>
+  <div class="como-grade">
+    <div><h3>Caminhar</h3><p>Clique ou toque no chão. No teclado, use as setas ou W, A, S, D. A câmera acompanha seu personagem.</p></div>
+    <div><h3>Interagir</h3><p>Clique em personagens, placas, lotes e alertas. Ou chegue perto e aperte E, Espaço ou Enter.</p></div>
+    <div><h3>Desafios</h3><p>Moradores com balão laranja fazem perguntas. As alternativas mudam de ordem a cada jogada. Acertos dão pontos e créditos verdes.</p></div>
+    <div><h3>Construir</h3><p>Lotes amarelos recebem construções. Compare energia, emissões, água, biodiversidade e bem-estar social antes de escolher.</p></div>
+    <div><h3>Resolver problemas</h3><p>Alertas vermelhos mostram fontes poluentes. Algumas só podem ser desligadas quando já existe energia limpa suficiente.</p></div>
+    <div><h3>Mapa e zoom</h3><p>Arraste para olhar em volta, use a roda do mouse ou o gesto de pinça para o zoom. Clique no minimapa para caminhar até lá.</p></div>
+  </div>
+  <button class="bt bt-ouro" data-fechar>Vamos jogar</button>
+</section>
+
+<section id="modal-vitoria" class="modal painel" hidden role="dialog" aria-labelledby="vit-titulo">
+  <div id="vit-insignia" class="vit-insignia"></div>
+  <p class="eyebrow">Missão concluída</p>
+  <h2 id="vit-titulo" class="titulo-painel"></h2>
+  <div id="vit-estrelas" class="estrelas"></div>
+  <dl id="vit-resumo" class="resumo"></dl>
+  <button id="vit-ok" class="bt bt-ouro bt-grande">Voltar ao mapa central</button>
+</section>
+
+<section id="modal-24h" class="modal painel modal-largo" hidden role="dialog" aria-labelledby="h24-titulo">
+  <button class="fechar bt-ico" data-fechar title="Fechar"></button>
+  <p class="eyebrow">Rede inteligente</p>
+  <h2 id="h24-titulo" class="titulo-painel">Painel das 24 horas</h2>
+  <p class="nota">Barras coloridas: geração renovável em cada hora. Linha branca: consumo da cidade. Horas em vermelho ficam sem energia limpa suficiente.</p>
+  <div class="grafico-caixa"><canvas id="h24-grafico" width="900" height="320"></canvas></div>
+  <div id="h24-legenda" class="legenda"></div>
+  <p id="h24-resumo" class="requisito"></p>
+</section>
+
+<div id="carregando" hidden><div class="girando"></div><p id="carregando-texto">Preparando o mapa…</p></div>
+
+<script src="audio/vozes/manifest.js"></script>
+<script src="js/nucleo.js"></script>
+<script src="js/qualidade.js"></script>
+<script src="js/audio.js"></script>
+<script src="js/sprites.js"></script>
+<script src="js/terreno.js"></script>
+<script src="js/dados.js"></script>
+<script src="js/falas.js"></script>
+<script src="js/mapas.js"></script>
+<script src="js/motor.js"></script>
+<script src="js/jogo.js"></script>
+<!--/CORPO-->
+</body>
+</html>
