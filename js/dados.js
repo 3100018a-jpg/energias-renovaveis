@@ -365,7 +365,7 @@
     insignia: { nome: 'Energia do Canavial', desc: 'Transforma resíduos agrícolas em energia sem degradar o campo.' },
     narrador: { nome: 'Zé Bento', papel: 'Agrônomo da cooperativa', voz: 'bento', look: 'bento' },
     intro: [
-      'Ô, seja bem-vindo! Eu sou o Zé Bento, agrônomo da cooperativa. Aqui é terra de cana-de-açúcar a perder de vista.',
+      'Bãom? Eu sou o Zé Bento, agrônomo da cooperativa. Aqui é terra de cana-de-açúcar a perder de vista.',
       'Da cana sai o açúcar e o etanol. Sobram o bagaço, a palha e a vinhaça, que podem virar energia ou virar problema.',
       'Ainda tem gente queimando a palha antes da colheita, e a fumaça adoece a cidade. Sua missão: acabar com as queimadas e usar os resíduos com inteligência.',
     ],
@@ -455,7 +455,7 @@
     insignia: { nome: 'Floresta Viva', desc: 'Protege a floresta e cria renda com ela em pé.' },
     narrador: { nome: 'Jaci', papel: 'Guardiã da floresta e agente agroflorestal', voz: 'jaci', look: 'jaci' },
     intro: [
-      'Olá, parente. Meu nome é Jaci. Sou guardiã desta floresta e trabalho com agroflorestas na minha comunidade.',
+      'Olá! Meu nome é Jaci. Sou guardiã desta floresta e trabalho com agroflorestas na minha comunidade.',
       'O fogo está avançando sobre a mata para abrir pasto. Quando a floresta queima, o carbono vai para o ar e a chuva diminui.',
       'Sua missão: combater a queimada, recuperar as áreas degradadas e mostrar que a floresta em pé vale mais do que derrubada.',
     ],
@@ -545,7 +545,7 @@
     insignia: { nome: 'Dados Verdes', desc: 'Torna a internet e a inteligência artificial mais sustentáveis.' },
     narrador: { nome: 'Thiago Matos', papel: 'Engenheiro de computação', voz: 'thiago', look: 'thiago' },
     intro: [
-      'Fala, pessoal! Eu sou o Thiago, engenheiro de computação. Cada vídeo, jogo ou pergunta para uma inteligência artificial passa por um data center.',
+      'E aí, beleza? Eu sou o Thiago, engenheiro de computação. Cada vídeo, jogo ou pergunta para uma inteligência artificial passa por um data center.',
       'Este data center novo usa energia como uma cidade inteira, gasta muita água para resfriar os servidores e tem geradores a diesel barulhentos.',
       'Sua missão: abastecer o data center com energia renovável, economizar água, reduzir o ruído e aproveitar o calor que sobra.',
     ],

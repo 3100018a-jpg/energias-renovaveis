@@ -494,14 +494,32 @@
     const estradas = [], mares = [], pastos = [];
     for (let y = 0; y < m.N; y++) for (let x = 0; x < m.N; x++) {
       const t = m.T(x, y);
-      if (t === T.ESTRADA || t === T.PONTE) estradas.push([x, y]);
+      if ((t === T.ESTRADA || t === T.PONTE) && !(m.semZigueZague && ehEscada(m, x, y))) estradas.push([x, y]);
       else if ((t === T.MAR || t === T.MAR_FUNDO) && !m.bloq[m.i(x, y)]) mares.push([x, y]);
       else if (t === T.PASTO && !m.bloq[m.i(x, y)]) pastos.push([x, y]);
+    }
+    // só circulam veículos em redes de ruas contínuas (trechos curtos e isolados
+    // fariam o carro ir e voltar sem parar)
+    {
+      const comp = new Int32Array(m.N * m.N).fill(-1), tam = [];
+      estradas.forEach((e0) => {
+        if (comp[m.i(e0[0], e0[1])] >= 0) return;
+        const id = tam.length; let n = 0; const fila = [e0]; comp[m.i(e0[0], e0[1])] = id;
+        while (fila.length) {
+          const [x, y] = fila.pop(); n++;
+          vizEstrada(x, y).forEach((q) => { const k = m.i(q[0], q[1]); if (comp[k] < 0) { comp[k] = id; fila.push(q); } });
+        }
+        tam.push(n);
+      });
+      const boas = estradas.filter((e0) => tam[comp[m.i(e0[0], e0[1])]] >= 14);
+      estradas.length = 0; boas.forEach((e0) => estradas.push(e0));
     }
     const CORES = ['#e04a3a', '#2f7ad2', '#f0c419', '#ffffff', '#2fa05a', '#8a5bd0', '#ff8a3a', '#30c0c0'];
     const nv = Math.round(Math.min(estradas.length / 9, 46) * cfg.veiculos);
     for (let i = 0; i < nv && estradas.length > 2; i++) {
       const p = r.pick(estradas);
+      // mapas podem dispensar veículos de certa cor (ex.: carro azul em zigue-zague nos canaviais)
+      if (m.semCorVeiculo && CORES[i % CORES.length] === m.semCorVeiculo) continue;
       M.veiculos.push({ x: p[0], y: p[1], px: p[0], py: p[1], nx: p[0], ny: p[1], t: 1, vel: r.range(1.2, 2.2), cor: CORES[i % CORES.length], tipo: r() < 0.15 ? 'onibus' : r() < 0.25 ? 'caminhao' : 'carro' });
     }
     const nb = Math.round(Math.min(mares.length / 160, 9) * Math.max(cfg.veiculos, 0.3));
@@ -521,9 +539,17 @@
     }
   };
 
+  function ehEstrada(m, x, y) { const t = m.T(x, y); return m.dentro(x, y) && (t === T.ESTRADA || t === T.PONTE); }
+  // trecho em "escada" (curva de um só tile em estrada diagonal): carros ali andam em zigue-zague
+  function ehEscada(m, x, y) {
+    const v = [[1, 0], [-1, 0], [0, 1], [0, -1]].map((d) => ehEstrada(m, x + d[0], y + d[1]));
+    const n = v.filter(Boolean).length;
+    if (n !== 2) return false;
+    return !((v[0] && v[1]) || (v[2] && v[3]));
+  }
   function vizEstrada(x, y) {
     const m = M.mapa;
-    return [[1, 0], [-1, 0], [0, 1], [0, -1]].map((d) => [x + d[0], y + d[1]]).filter((p) => { const t = m.T(p[0], p[1]); return m.dentro(p[0], p[1]) && (t === T.ESTRADA || t === T.PONTE); });
+    return [[1, 0], [-1, 0], [0, 1], [0, -1]].map((d) => [x + d[0], y + d[1]]).filter((p) => ehEstrada(m, p[0], p[1]) && !(m.semZigueZague && ehEscada(m, p[0], p[1])));
   }
 
   // ---------- caminhos (A*) ----------
@@ -628,6 +654,7 @@
   M.atualizar = function (dt) {
     M.t += dt;
     const j = M.jogador, m = M.mapa;
+    if (M.pausado) { j.andando = false; }
     if (!M.pausado) {
       // teclado
       const k = M.teclas;
@@ -648,8 +675,8 @@
           if (Math.abs(m.H(tx, ty) - m.H(Math.floor(j.x), Math.floor(j.y))) > 1) return false;
           j.x = nx; j.y = ny; return true;
         };
-        if (!tenta(j.x + dx, j.y + dy)) { tenta(j.x + dx, j.y) || tenta(j.x, j.y + dy); }
-        j.andando = true; M.cam.livre = 0;
+        const moveu = tenta(j.x + dx, j.y + dy) || tenta(j.x + dx, j.y) || tenta(j.x, j.y + dy);
+        j.andando = moveu; M.cam.livre = 0;
         const sxm = dx - dy; if (Math.abs(sxm) > 0.0001) j.dir = sxm > 0 ? 1 : -1;
       } else if (j.caminho.length) {
         const alvo = j.caminho[0];
@@ -657,10 +684,12 @@
         const dx = tx - j.x, dy = ty - j.y;
         const d = Math.hypot(dx, dy);
         const passo = vel * dt;
-        if (d <= passo) { j.x = tx; j.y = ty; j.caminho.shift(); if (!j.caminho.length) { const f = j.aoChegar; j.aoChegar = null; M.marcaDestino = null; if (f) f(); } }
+        let chegou = false, aoChegar = null;
+        if (d <= passo) { j.x = tx; j.y = ty; j.caminho.shift(); if (!j.caminho.length) { chegou = true; aoChegar = j.aoChegar; j.aoChegar = null; M.marcaDestino = null; } }
         else { j.x += dx / d * passo; j.y += dy / d * passo; }
         const sxm = dx - dy; if (Math.abs(sxm) > 0.05) j.dir = sxm > 0 ? 1 : -1;
-        j.andando = true;
+        j.andando = !chegou;
+        if (aoChegar) aoChegar();
       }
       if (j.andando) {
         j.passoT += dt;
@@ -910,8 +939,56 @@
     M.desenharMoldura(c);
     // período do dia: entardecer e noite
     M.iluminar(c, vis, lista);
+    // trajeto e ponto de destino do jogador (sempre visíveis, de dia e à noite)
+    M.desenharRota(c);
     // marcadores flutuantes (pins, balões) sempre visíveis
     M.desenharMarcadores(c, vis);
+  };
+
+  // ---------- trajeto suave até o destino ----------
+  M.desenharRota = function (c) {
+    const m = M.mapa, j = M.jogador;
+    const md = M.marcaDestino;
+    if (!md && !j.caminho.length) return;
+    // pontos: posição atual do jogador + centros dos tiles restantes
+    const pts = [M.posJogador()];
+    j.caminho.forEach((p) => pts.push(M.centro(p[0], p[1], m.H(p[0], p[1]))));
+    c.save();
+    c.lineCap = 'round'; c.lineJoin = 'round';
+    if (pts.length > 1) {
+      const tracar = () => {
+        c.beginPath(); c.moveTo(pts[0][0], pts[0][1]);
+        for (let i = 1; i < pts.length - 1; i++) {
+          const mx = (pts[i][0] + pts[i + 1][0]) / 2, my = (pts[i][1] + pts[i + 1][1]) / 2;
+          c.quadraticCurveTo(pts[i][0], pts[i][1], mx, my);
+        }
+        const u = pts[pts.length - 1]; c.lineTo(u[0], u[1]);
+      };
+      const z = Math.max(0.7, M.cam.z);
+      tracar(); c.strokeStyle = 'rgba(120,235,215,.24)'; c.lineWidth = 15 / z; c.stroke();
+      tracar(); c.strokeStyle = 'rgba(150,240,222,.66)'; c.lineWidth = 6.5 / z; c.stroke();
+      tracar(); c.setLineDash([2 / z, 9 / z]); c.lineDashOffset = -M.t * 22 / z;
+      c.strokeStyle = 'rgba(255,255,255,.9)'; c.lineWidth = 2.2 / z; c.stroke(); c.setLineDash([]);
+    }
+    if (md) {
+      const p = M.centro(md.x, md.y, m.H(md.x, md.y));
+      const z = Math.max(0.7, M.cam.z);
+      c.fillStyle = 'rgba(150,240,222,.32)';
+      c.beginPath(); c.ellipse(p[0], p[1], 14, 7, 0, 0, 7); c.fill();
+      for (let k = 0; k < 2; k++) {
+        const f = (M.t * 0.9 + k * 0.5) % 1;
+        c.strokeStyle = `rgba(190,250,236,${0.85 * (1 - f)})`; c.lineWidth = 2 / z;
+        c.beginPath(); c.ellipse(p[0], p[1], 8 + f * 16, (8 + f * 16) / 2, 0, 0, 7); c.stroke();
+      }
+      // marcador flutuante do destino
+      const y = p[1] - 22 + Math.sin(M.t * 4) * 2.5;
+      c.fillStyle = 'rgba(120,235,215,.95)';
+      c.beginPath(); c.moveTo(p[0], p[1] - 6); c.lineTo(p[0] - 5, y + 4); c.lineTo(p[0] + 5, y + 4); c.closePath(); c.fill();
+      c.beginPath(); c.arc(p[0], y, 7, 0, 7); c.fill();
+      c.strokeStyle = '#ffffff'; c.lineWidth = 1.6; c.stroke();
+      c.fillStyle = '#ffffff'; c.beginPath(); c.arc(p[0], y, 2.4, 0, 7); c.fill();
+    }
+    c.restore();
   };
 
   // ---------- dia, entardecer e noite ----------
@@ -1104,20 +1181,6 @@
       c.setLineDash([6, 4]); c.lineDashOffset = -M.t * 12;
       c.strokeStyle = '#ffe14a'; c.lineWidth = 2.2; c.stroke(); c.setLineDash([]);
     });
-    // destino
-    if (M.marcaDestino) {
-      const md = M.marcaDestino; md.t += 0.016;
-      const p = M.centro(md.x, md.y, m.H(md.x, md.y));
-      const k = (M.t * 1.5) % 1;
-      c.strokeStyle = `rgba(255,255,255,${1 - k})`; c.lineWidth = 2;
-      c.beginPath(); c.ellipse(p[0], p[1], 8 + k * 12, (8 + k * 12) / 2, 0, 0, 7); c.stroke();
-    }
-    // caminho
-    const j = M.jogador;
-    if (j.caminho.length > 1) {
-      c.fillStyle = 'rgba(255,255,255,.55)';
-      j.caminho.forEach((p, i) => { if (i % 2) return; const w = M.centro(p[0], p[1], m.H(p[0], p[1])); c.beginPath(); c.ellipse(w[0], w[1], 2.6, 1.4, 0, 0, 7); c.fill(); });
-    }
   };
 
   M.desenharEnt = function (c, e, res) {
@@ -1184,8 +1247,17 @@
     const perto = Math.hypot(j.x - e.x, j.y - e.y) < 4;
     const dir = perto ? ((j.x - j.y) - (e.x - e.y) >= 0 ? 1 : -1) : (e.dir || 1);
     const hl = M.hover === e;
+    let look = e.look;
+    if (e.marcador === 'feito') {
+      // morador já atendido: roupa verde padrão e aro verde no chão
+      look = e._lookFeito || (e._lookFeito = Object.assign({}, e.look, { camisa: '#2fbf6a', calca: '#1f6f45', colete: '#d8ffe6' }));
+      c.fillStyle = 'rgba(47,191,106,.35)';
+      c.beginPath(); c.ellipse(e.wx, e.wy, 15, 7.5, 0, 0, 7); c.fill();
+      c.strokeStyle = 'rgba(120,240,160,.95)'; c.lineWidth = 2;
+      c.beginPath(); c.ellipse(e.wx, e.wy, 15, 7.5, 0, 0, 7); c.stroke();
+    }
     if (hl) { c.save(); c.shadowColor = 'rgba(255,230,90,.95)'; c.shadowBlur = 12; }
-    SPR.pessoa(c, e.wx, e.wy, e.look, M.t + e.x, false, dir, 1.15);
+    SPR.pessoa(c, e.wx, e.wy, look, M.t + e.x, false, dir, 1.15);
     if (hl) c.restore();
   };
 
@@ -1260,7 +1332,7 @@
       if (e.kind === 'npc') {
         if (e.marcador === 'desafio') { icone = 'falar'; cor = '#f0a21f'; }
         else if (e.marcador === 'narrador') { icone = 'alvo'; cor = '#6a4fd0'; }
-        else if (e.marcador === 'feito') { icone = 'estrela'; cor = '#2e9e4a'; }
+        else if (e.marcador === 'feito') { icone = 'ok'; cor = '#2fbf6a'; }
       } else if (e.kind === 'lote' && !e.construido) { icone = 'martelo'; cor = '#e0a400'; }
       else if (e.kind === 'problema' && !e.resolvido) { icone = 'alerta'; cor = '#e0482a'; }
       else if (e.kind === 'info' && !e.lido) { icone = 'info'; cor = '#2a7fd0'; }
@@ -1310,6 +1382,7 @@
       let cor = null;
       if (e.kind === 'pin') cor = e.concluida ? '#ffd23f' : e.cor;
       else if (e.kind === 'npc' && e.marcador === 'desafio') cor = '#f0a21f';
+      else if (e.kind === 'npc' && e.marcador === 'feito') cor = '#2fbf6a';
       else if (e.kind === 'npc' && e.marcador === 'narrador') cor = '#b59cff';
       else if (e.kind === 'lote' && !e.construido) cor = '#ffe14a';
       else if (e.kind === 'problema' && !e.resolvido) cor = '#ff4a2a';
@@ -1372,7 +1445,7 @@
     }, { passive: false });
     window.addEventListener('keydown', (ev) => {
       if (ev.target && /INPUT|TEXTAREA|SELECT/.test(ev.target.tagName)) return;
-      if (M.pausado) return;
+      if (M.pausado || !M.mapa) return;
       if (/Arrow|Key[WASD]/.test(ev.code)) { M.teclas[ev.code] = true; ev.preventDefault(); }
       if (ev.code === 'KeyE' || ev.code === 'Space' || ev.code === 'Enter') { const e = M.maisProximo(); if (e) { ev.preventDefault(); ERS.bus.emit('interagir', e); } }
       if (ev.code === 'Equal' || ev.code === 'NumpadAdd') M.zoomAlvo = U.clamp(M.cam.z * 1.2, Q.cfg.zoomMin, 2.2);

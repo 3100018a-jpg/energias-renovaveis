@@ -16,7 +16,12 @@
     conquistas: S.get('conquistas', []),
     limpasTotal: S.get('limpasTotal', 0),
     progresso: S.get('progresso', {}),
-    periodos: S.get('periodos', {}),
+    periodos: (function () {
+      // versão 2: o mapa principal passa a começar no ciclo automático
+      const p = S.get('periodos', {});
+      if (S.get('versaoPeriodo', 1) < 2) { delete p.hub; delete p.todos; S.set('periodos', p); S.set('versaoPeriodo', 2); }
+      return p;
+    })(),
     local: 'hub', ms: null, est: null,
   });
   function salvar() {
@@ -230,7 +235,8 @@
 
   // ---------- período do dia ----------
   const PERIODOS = [['dia', 'Dia', 'sol'], ['tarde', 'Entardecer', 'entardecer'], ['noite', 'Noite', 'lua'], ['ciclo', 'Ciclo automático', 'ciclo']];
-  const periodoDe = (local) => J.periodos[local] || J.periodos.todos || 'dia';
+  // mapa principal: ciclo automático por padrão; missões: dia por padrão
+  const periodoDe = (local) => J.periodos[local] || J.periodos.todos || (local === 'hub' ? 'ciclo' : 'dia');
   function aplicarPeriodo(p, local, todos) {
     if (todos) { J.periodos = { todos: p }; } else J.periodos[local || J.local] = p;
     salvar();
@@ -263,6 +269,7 @@
     $('chip-creditos').hidden = !emMissao;
     if (emMissao) $('hud-creditos').textContent = J.est.creditos;
     $('bt-voltar-hub').hidden = !emMissao;
+    $('bt-sair').hidden = !!emMissao;
     if (emMissao) {
       $('hud-titulo').textContent = J.ms.nome;
       $('hud-sub').textContent = J.ms.fonte;
@@ -809,6 +816,20 @@
     }, pin ? [pin[0] + 1, pin[1] + 1] : null);
   }
   $('bt-voltar-hub').onclick = () => { if (!dlgAtivo && !modalAberto) voltarHub(); };
+  // sair do mapa principal e voltar à tela inicial
+  function sairParaInicio() {
+    if (dlgAtivo) dlgAtivo.pular();
+    if (modalAberto) fecharModal(true);
+    A.parar();
+    salvar();
+    M.mapa = null;
+    ['hud', 'caixa-minimapa', 'painel-missao', 'dialogo', 'prompt-interagir', 'dica-hover', 'selo-qualidade'].forEach((id) => { $(id).hidden = true; });
+    $('bt-continuar').hidden = !J.perfil;
+    $('bt-novo').textContent = J.perfil ? 'Novo personagem' : 'Novo jogo';
+    $('tela-inicio').hidden = false;
+    setTimeout(() => $('bt-continuar').focus({ preventScroll: true }), 50);
+  }
+  $('bt-sair').onclick = () => { A.sfx('clique'); sairParaInicio(); };
 
   // ---------- conquistas e insígnias ----------
   function addConquista(id) {
@@ -931,6 +952,7 @@
   $('bt-config').innerHTML = ERS.svg('ajustes');
   $('bt-tela').innerHTML = ERS.svg('tela');
   $('bt-voltar-hub').innerHTML = ERS.svg('mapa');
+  $('bt-sair').innerHTML = ERS.svg('sair');
   $('bt-centralizar').innerHTML = ERS.svg('alvo');
   ['modal-construir', 'modal-problema', 'modal-info', 'modal-missao', 'modal-insignias', 'modal-config', 'modal-como', 'modal-24h'].forEach((id) => {
     const b = $(id).querySelector('.fechar'); if (b) b.innerHTML = ERS.svg('fechar');

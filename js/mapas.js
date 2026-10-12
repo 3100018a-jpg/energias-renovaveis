@@ -695,6 +695,8 @@
     edI(m, 'galpao', 0.55, 0.36, [2, 1]);
     [0.46, 0.49].forEach((x) => edI(m, 'containers', x, 0.36, [1, 1], 2));
     edI(m, 'fazenda', 0.1, 0.7, [1, 1]);
+    m.semCorVeiculo = '#2f7ad2';
+    m.semZigueZague = true;
     m.animaisExtras = [];
     arborizar(m, { densGrama: 0.08 });
     limpar(m);
