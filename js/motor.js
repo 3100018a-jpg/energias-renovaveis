@@ -572,13 +572,11 @@
       const n = seq.length;
       if (n < 2) continue;
       const cen = seq.map((t) => [t[0] + 0.5, t[1] + 0.5]);
-      // suavização gaussiana larga: estradas em "escada" (inclinadas em relação à grade)
-      // viram uma linha contínua, sem dobras a cada degrau
-      const R = 5, SIG2 = 2 * 2.2 * 2.2;
+      const R = 2;
       const suave = cen.map((_, i) => {
         const r = ciclo ? R : Math.min(R, i, n - 1 - i);
         let sx2 = 0, sy2 = 0, k = 0;
-        for (let j = i - r; j <= i + r; j++) { const q = cen[((j % n) + n) % n], w = Math.exp(-((j - i) * (j - i)) / SIG2); sx2 += q[0] * w; sy2 += q[1] * w; k += w; }
+        for (let j = i - r; j <= i + r; j++) { const q = cen[((j % n) + n) % n]; sx2 += q[0]; sy2 += q[1]; k++; }
         return [sx2 / k, sy2 / k];
       });
       const lim = ciclo ? n : n - 1;
@@ -1260,9 +1258,7 @@
       if (v.t >= 1) {
         v.t -= 1; v.px = v.x; v.py = v.y; v.x = v.nx; v.y = v.ny; v.nx = v.nnx; v.ny = v.nny;
         const viz = vizEstrada(v.nx, v.ny).filter((p) => !(p[0] === v.x && p[1] === v.y));
-        // nos cruzamentos o motorista costuma seguir em frente; às vezes vira
-        const reto = viz.find((p) => p[0] - v.nx === v.nx - v.x && p[1] - v.ny === v.ny - v.y);
-        const esc = !viz.length ? [v.x, v.y] : reto && Math.random() < 0.65 ? reto : viz[Math.floor(Math.random() * viz.length)];
+        const esc = viz.length ? viz[Math.floor(Math.random() * viz.length)] : [v.x, v.y];
         v.nnx = esc[0]; v.nny = esc[1];
       }
       posVeiculo(v);
