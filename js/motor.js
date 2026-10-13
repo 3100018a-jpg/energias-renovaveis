@@ -66,11 +66,12 @@
       const dtReal = Math.min(0.25, (agora - ultimo) / 1000);
       ultimo = agora;
       acum += dtReal;
+      Q.tick(dtReal);
       const minDt = 1 / Q.cfg.fpsMax - 0.002;
       if (acum < minDt) return;
       const dt = Math.min(0.1, acum);
       acum = 0;
-      Q.medir(dt, document.hidden);
+      Q.medir(dt, document.hidden || !M.mapa);
       if (!M.mapa) return;
       M.atualizar(dt);
       M.desenhar();
@@ -92,6 +93,7 @@
   M.carregar = function (mapa, opcoes) {
     opcoes = opcoes || {};
     M.mapa = mapa;
+    M.tCiclo = 0; // todo mapa começa no Dia
     M.particulas = []; M.efeitos = [];
     M.hover = null;
     // prepara entidades
@@ -783,6 +785,7 @@
   // ---------- atualização ----------
   M.atualizar = function (dt) {
     M.t += dt;
+    M.tCiclo += dt;
     const j = M.jogador, m = M.mapa;
     if (M.pausado) { j.andando = false; }
     if (!M.pausado) {
@@ -1168,12 +1171,32 @@
     if (p === 'dia') return { n: 0, t: 0 };
     if (p === 'tarde') return { n: 0.12, t: 1 };
     if (p === 'noite') return { n: 1, t: 0 };
-    // ciclo automático de 6 minutos: dia → entardecer → noite → amanhecer
-    const f = (M.t / 360) % 1;
+    // ciclo automático de 6 minutos (360 s), sempre começando no dia:
+    // dia → entardecer → noite → aurora (12 s) → dia → ...
+    const s = M.tCiclo % M.DURACAO_CICLO;
     const liso = (a, b, x) => U.smooth(U.clamp((x - a) / (b - a), 0, 1));
-    const t = liso(0.36, 0.46, f) * (1 - liso(0.5, 0.58, f)) + liso(0.88, 0.93, f) * (1 - liso(0.95, 1, f));
-    const n = liso(0.5, 0.6, f) * (1 - liso(0.86, 0.95, f));
+    const C = M.CICLO;
+    const t = liso(C.diaFim, C.tardeIni, s) * (1 - liso(C.tardeFim, C.noiteIni, s))       // entardecer
+            + liso(C.noiteFim, C.auroraIni, s) * (1 - liso(C.auroraFim, C.diaIni, s));    // aurora
+    const noite = liso(C.tardeFim, C.noiteIni, s) * (1 - liso(C.noiteFim, C.auroraIni, s));
+    const n = noite + 0.12 * t * (1 - noite);                     // mesmo tom do Entardecer fixo
     return { n, t };
+  };
+  M.DURACAO_CICLO = 360;
+  // marcos do ciclo, em segundos (entre um marco e o seguinte há transição suave)
+  M.CICLO = {
+    diaFim: 126, tardeIni: 144, tardeFim: 169, noiteIni: 191,   // dia 126 s, entardecer 25 s
+    noiteFim: 300, auroraIni: 306, auroraFim: 318, diaIni: 324, // noite 109 s, aurora 12 s
+  };
+  M.tCiclo = 0;
+  // fase atual do ciclo automático, para mostrar ao jogador
+  M.faseCiclo = function () {
+    const s = M.tCiclo % M.DURACAO_CICLO, C = M.CICLO;
+    if (s < (C.diaFim + C.tardeIni) / 2) return 'Dia';
+    if (s < (C.tardeFim + C.noiteIni) / 2) return 'Entardecer';
+    if (s < C.auroraIni) return 'Noite';
+    if (s < C.auroraFim) return 'Aurora';
+    return 'Dia';
   };
   M.iluminar = function (c, vis, lista) {
     const F = M.fase();

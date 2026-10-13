@@ -21,9 +21,11 @@
     _amostras: [],
     _t0: 0,
     _cooldown: 0,
-    _subidas: 0,
-    _rebaixado: {},
+    _boas: 0,               // janelas seguidas com folga de desempenho
+    _rebaixado: {},         // { nivel: { n: quedas, t: momento da última queda } }
   });
+  const AMOSTRAS = 45;      // ~0,75 s de quadros por medição (resposta imediata)
+  const ESPERA = 1.5;       // segundos de pausa após cada troca de nível
 
   // estimativa inicial a partir do hardware
   Q.estimar = function () {
@@ -62,43 +64,84 @@
     Q.nivel = nivel;
     Q.cfg = NIVEIS[nivel];
     Q._amostras = [];
-    Q._cooldown = 3;
+    Q._boas = 0;
+    Q._cooldown = ESPERA;
     if (mudou) ERS.bus.emit('qualidade', { nivel, motivo });
   };
 
+  // O jogo sempre começa na qualidade Alta. No modo Automático, o desempenho
+  // real do computador ou celular decide, em poucos instantes, se é preciso
+  // descer para Médio, Baixo ou Mínimo, ou voltar para o Alto.
   Q.iniciar = function () {
+    // versão 2: preferências antigas voltam ao Automático começando no Alto
+    if (ERS.S.get('versaoQualidade', 1) < 2) { ERS.S.set('qualidade', 'auto'); ERS.S.set('versaoQualidade', 2); }
     const salvo = ERS.S.get('qualidade', 'auto');
-    Q.modo = salvo;
-    if (salvo === 'auto') Q.aplicar(Q.estimar(), 'estimativa');
-    else Q.aplicar(salvo, 'manual');
+    Q.modo = NIVEIS[salvo] ? salvo : 'auto';
+    Q.estimativa = Q.estimar(); // apenas informativo
+    Q._rebaixado = {};
+    Q.aplicar(Q.modo === 'auto' ? 'alto' : Q.modo, Q.modo === 'auto' ? 'inicio' : 'manual');
   };
 
   Q.definirModo = function (modo) {
     Q.modo = modo;
     ERS.S.set('qualidade', modo);
-    if (modo === 'auto') { Q._rebaixado = {}; Q.aplicar(Q.estimar(), 'estimativa'); }
+    if (modo === 'auto') { Q._rebaixado = {}; Q.aplicar('alto', 'inicio'); }
     else Q.aplicar(modo, 'manual');
   };
+
+  // pode voltar a um nível que já ficou pesado? Só depois de um tempo,
+  // e cada nova queda aumenta a espera (evita ficar alternando sem parar).
+  function podeSubirPara(nivel, agora) {
+    const r = Q._rebaixado[nivel];
+    if (!r) return true;
+    if (r.n >= 4) return false;
+    return agora - r.t > 15000 * r.n;
+  }
+
+  // taxa de atualização da tela (60 Hz, 120 Hz...), medida pelos intervalos
+  // entre quadros do navegador, inclusive os que o jogo não desenha
+  Q._refresh = 60;
+  Q._ticks = [];
+  Q.tick = function (dtReal) {
+    if (dtReal <= 0 || dtReal > 0.1) return;
+    Q._ticks.push(dtReal);
+    if (Q._ticks.length < 120) return;
+    const arr = Q._ticks.sort((a, b) => a - b);
+    const r = 1 / arr[Math.floor(arr.length * 0.2)];
+    Q._ticks = [];
+    if (r > Q._refresh && r < 250) Q._refresh = r;
+  };
+  // quadros por segundo que o nível consegue de fato mostrar nesta tela
+  function alvoReal() {
+    const R = Q._refresh, fps = Q.cfg.fpsMax;
+    return Math.min(fps, R / Math.max(1, Math.ceil((1 / fps - 0.002) * R - 0.05)));
+  }
 
   // chamado a cada quadro com dt (s). Ajusta automaticamente.
   Q.medir = function (dt, oculto) {
     if (Q.modo !== 'auto' || oculto || dt <= 0 || dt > 0.5) return;
     if (Q._cooldown > 0) { Q._cooldown -= dt; return; }
     Q._amostras.push(dt);
-    if (Q._amostras.length < 90) return;
+    if (Q._amostras.length < AMOSTRAS) return;
     const arr = Q._amostras.slice().sort((a, b) => a - b);
     const med = arr[Math.floor(arr.length * 0.5)];
     const p90 = arr[Math.floor(arr.length * 0.9)];
     Q._amostras = [];
     const fpsMed = 1 / med;
-    const alvo = Q.cfg.fpsMax;
+    const alvo = alvoReal();
     const i = ORDEM.indexOf(Q.nivel);
+    const agora = performance.now();
     if ((fpsMed < alvo * 0.72 || 1 / p90 < alvo * 0.5) && i < ORDEM.length - 1) {
-      Q._rebaixado[Q.nivel] = (Q._rebaixado[Q.nivel] || 0) + 1;
-      Q.aplicar(ORDEM[i + 1], 'desempenho');
-    } else if (fpsMed > alvo * 0.97 && i > 0 && Q._subidas < 2) {
+      // muito lento: desce dois níveis de uma vez; lento: desce um
+      const passo = fpsMed < alvo * 0.4 && i < ORDEM.length - 2 ? 2 : 1;
+      const r = Q._rebaixado[Q.nivel] || { n: 0, t: 0 };
+      Q._rebaixado[Q.nivel] = { n: r.n + 1, t: agora };
+      Q.aplicar(ORDEM[i + passo], 'desempenho');
+    } else if (fpsMed > alvo * 0.95 && 1 / p90 > alvo * 0.75 && i > 0) {
+      // folga contínua (~3 s): tenta o nível acima, até voltar ao Alto
+      Q._boas++;
       const acima = ORDEM[i - 1];
-      if (!Q._rebaixado[acima]) { Q._subidas++; Q.aplicar(acima, 'folga'); }
-    }
+      if (Q._boas >= 4 && podeSubirPara(acima, agora)) Q.aplicar(acima, 'folga');
+    } else Q._boas = 0;
   };
 })();

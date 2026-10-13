@@ -19,9 +19,9 @@
     limpasTotal: S.get('limpasTotal', 0),
     progresso: S.get('progresso', {}),
     periodos: (function () {
-      // versão 2: o mapa principal passa a começar no ciclo automático
-      const p = S.get('periodos', {});
-      if (S.get('versaoPeriodo', 1) < 2) { delete p.hub; delete p.todos; S.set('periodos', p); S.set('versaoPeriodo', 2); }
+      // versão 3: todos os mapas passam a começar no ciclo automático (iniciando no Dia)
+      let p = S.get('periodos', {});
+      if (S.get('versaoPeriodo', 1) < 3) { p = {}; S.set('periodos', p); S.set('versaoPeriodo', 3); }
       return p;
     })(),
     local: 'hub', ms: null, est: null,
@@ -242,13 +242,13 @@
   }
 
   // ---------- período do dia ----------
-  const PERIODOS = [['dia', 'Dia', 'sol'], ['tarde', 'Entardecer', 'entardecer'], ['noite', 'Noite', 'lua'], ['ciclo', 'Ciclo automático', 'ciclo']];
-  // mapa principal: ciclo automático por padrão; missões: dia por padrão
-  const periodoDe = (local) => J.periodos[local] || J.periodos.todos || (local === 'hub' ? 'ciclo' : 'dia');
+  const PERIODOS = [['ciclo', 'Ciclo automático', 'ciclo'], ['dia', 'Dia', 'sol'], ['tarde', 'Entardecer', 'entardecer'], ['noite', 'Noite', 'lua']];
+  // todos os mapas: ciclo automático por padrão (começa no Dia: dia → entardecer → noite → aurora → dia...)
+  const periodoDe = (local) => J.periodos[local] || J.periodos.todos || 'ciclo';
   function aplicarPeriodo(p, local, todos) {
     if (todos) { J.periodos = { todos: p }; } else J.periodos[local || J.local] = p;
     salvar();
-    if (!local || local === J.local) { M.periodo = p; if (p === 'ciclo') M.t = 0; }
+    if (!local || local === J.local) { M.periodo = p; if (p === 'ciclo') M.tCiclo = 0; }
     atualizarHUD();
   }
   function segmentoPeriodo(el, atual, aoEscolher) {
@@ -266,7 +266,7 @@
     const prox = PERIODOS[(i + 1) % PERIODOS.length];
     aplicarPeriodo(prox[0], J.local);
     A.sfx('clique');
-    toast(prox[1]);
+    toast(prox[0] === 'ciclo' ? 'Ciclo automático: Dia → Entardecer → Noite → Aurora' : prox[1]);
   };
 
   // ---------- HUD ----------
@@ -291,7 +291,7 @@
     }
     const per = PERIODOS.find((o) => o[0] === M.periodo) || PERIODOS[0];
     $('bt-periodo').innerHTML = ERS.svg(per[2]);
-    $('bt-periodo').title = 'Período: ' + per[1] + ' (clique para mudar)';
+    $('bt-periodo').title = 'Período: ' + per[1] + (per[0] === 'ciclo' ? ' (Dia, Entardecer, Noite e Aurora)' : '') + ' · clique para mudar';
     $('bt-voz').innerHTML = ERS.svg(A.vozLigada ? 'som' : 'mudo');
     $('bt-voz').classList.toggle('ativo', A.vozLigada);
   }
@@ -956,7 +956,7 @@
       b.onclick = () => { Q.definirModo(o[0]); abrirConfig(); };
       seg.appendChild(b);
     });
-    $('cfg-qualidade-info').textContent = 'Em uso agora: ' + Q.NIVEIS[Q.nivel].nome + (Q.modo === 'auto' ? ' (ajuste automático conforme o desempenho do computador).' : ' (escolha manual).');
+    $('cfg-qualidade-info').textContent = 'Em uso agora: ' + Q.NIVEIS[Q.nivel].nome + (Q.modo === 'auto' ? ' (ajuste automático conforme o desempenho do computador ou celular).' : ' (escolha manual).');
     segmentoPeriodo($('cfg-periodo'), M.periodo, (p) => aplicarPeriodo(p, J.local, $('cfg-periodo-todos').checked));
     $('cfg-periodo-todos').checked = !!J.periodos.todos && Object.keys(J.periodos).length === 1;
     $('cfg-voz').checked = A.vozLigada;
@@ -1110,9 +1110,12 @@
   function iniciarJogo(primeiraVez) {
     A.iniciarAudio();
     carregarLocal('hub', () => {
+      // apresentação da Profª Iara Moreira sempre que o jogo é iniciado
       const q = quemNarrador();
-      if (primeiraVez && !S.get('introHub', false)) { S.set('introHub', true); dialogo(ERS.HUB.intro.map((t) => ({ quem: q, texto: t }))); }
-      else dialogo([{ quem: q, texto: nInsignias() >= 6 && !J.insignias.rede ? ERS.FRASES.hubFinal : ERS.FRASES.hubOla }]);
+      const falas = ERS.HUB.intro.map((t) => ({ quem: q, texto: t }));
+      if (!primeiraVez && nInsignias() >= 6 && !J.insignias.rede) falas.push({ quem: q, texto: ERS.FRASES.hubFinal });
+      S.set('introHub', true);
+      dialogo(falas);
     });
     $('selo-qualidade').hidden = false;
     $('selo-qualidade').textContent = 'Gráficos: ' + Q.NIVEIS[Q.nivel].nome + (Q.modo === 'auto' ? ' · automático' : '');
