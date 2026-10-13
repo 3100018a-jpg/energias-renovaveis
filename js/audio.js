@@ -65,8 +65,8 @@
   };
 
   // ---------- Web Speech ----------
-  const NOMES_F = /francisca|thalita|luciana|maria|fernanda|vit[oó]ria|brenda|elza|giovanna|leila|let[ií]cia|manuela|yara|raquel|google portugu[eê]s|female|feminina/i;
-  const NOMES_M = /ant[oô]nio|daniel|felipe|donato|f[aá]bio|humberto|j[uú]lio|nicolau|val[eé]rio|male|masculin/i;
+  const NOMES_F = /francisca|thalita|luciana|maria|fernanda|vit[oó]ria|brenda|elza|giovanna|leila|let[ií]cia|manuela|yara|raquel|google portugu[eê]s|\bfemale\b|feminina/i;
+  const NOMES_M = /ant[oô]nio|daniel|felipe|donato|f[aá]bio|humberto|j[uú]lio|nicolau|val[eé]rio|\bmale\b|masculin/i;
 
   function pontuar(v) {
     let s = 0;
@@ -87,7 +87,7 @@
       .filter((v) => /^pt[-_]BR$/i.test(v.lang) || /portugu[eê]s.*brasil/i.test(v.name))
       .filter((v) => !/multiling/i.test(v.name))
       // só vozes neurais e naturais; vozes robóticas antigas ficam de fora (nesse caso, só legenda)
-      .filter((v) => /natural|neural|online|premium|enhanced|aprimorad|superior/i.test(v.name))
+      .filter((v) => /natural|neural|online|premium|enhanced|aprimorad|superior|google/i.test(v.name))
       .map((v) => ({ v, nota: pontuar(v), genero: NOMES_M.test(v.name) ? 'M' : NOMES_F.test(v.name) ? 'F' : '?' }))
       .sort((a, b) => b.nota - a.nota);
     ERS.bus.emit('vozes', A.vozes);
@@ -97,16 +97,26 @@
     speechSynthesis.onvoiceschanged = A.carregarVozes;
   }
 
-  A.escolherVoz = function (genero, variante) {
+  // voz do navegador para um personagem: sempre do mesmo gênero; cada personagem
+  // fica com uma das vozes naturais disponíveis, de forma estável
+  A.escolherVoz = function (genero, variante, chave) {
     if (!A.vozes.length) return null;
+    const doGenero = A.vozes.filter((x) => x.genero === genero);
     if (A.vozEscolhida) {
-      const f = A.vozes.find((x) => x.v.name === A.vozEscolhida);
-      if (f) return { item: f, exata: f.genero === genero };
+      const f = doGenero.find((x) => x.v.name === A.vozEscolhida);
+      if (f) return { item: f, exata: true };
     }
-    // moradores alternam entre as boas vozes pt-BR do mesmo gênero instaladas no navegador
-    const melhores = A.vozes.filter((x) => x.genero === genero && x.nota >= A.vozes[0].nota - 6);
-    if (melhores.length) return { item: melhores[(variante || 0) % melhores.length], exata: true };
-    return { item: A.vozes[0], exata: A.vozes[0].genero === genero };
+    if (!doGenero.length) return null; // nunca uma voz do gênero errado
+    const melhores = doGenero.filter((x) => x.nota >= doGenero[0].nota - 6);
+    // a ordem do elenco espalha as vozes disponíveis entre os personagens da mesma missão
+    const ORDEM = genero === 'M' ? ['Antonio', 'Donato', 'Fabio', 'Humberto', 'Julio', 'Nicolau', 'Valerio'] : ['Francisca', 'Thalita', 'Brenda', 'Elza', 'Giovanna', 'Leila', 'Leticia', 'Manuela', 'Yara'];
+    const pos = ORDEM.indexOf(String(chave || ''));
+    const k = pos >= 0 ? pos : chave ? U.hash(String(chave)).split('').reduce((a, ch) => a + ch.charCodeAt(0), 0) : (variante || 0);
+    return { item: melhores[k % melhores.length], exata: true };
+  };
+  // vozes naturais do navegador por gênero (para avisar quando faltam)
+  A.vozesNaturais = function () {
+    return { F: A.vozes.filter((x) => x.genero === 'F').length, M: A.vozes.filter((x) => x.genero === 'M').length };
   };
 
   A.temMp3 = function (id) {
@@ -140,7 +150,7 @@
   function falarSintese(texto, perfil, token) {
     return new Promise((res) => {
       if (!('speechSynthesis' in window)) return res();
-      const esc = A.escolherVoz(perfil.genero || 'F', perfil.variante);
+      const esc = A.escolherVoz(perfil.genero || 'F', perfil.variante, perfil.vozAzure || perfil.edge);
       if (!esc) return res();
       const pedacos = dividir(A.textoFalado(texto));
       let i = 0;
@@ -149,9 +159,7 @@
         const u = new SpeechSynthesisUtterance(pedacos[i++]);
         u.voice = esc.item.v;
         u.lang = 'pt-BR';
-        let tom = perfil.tom || 1;
-        if (!esc.exata) tom *= perfil.genero === 'M' ? 0.82 : 1.12;
-        u.pitch = U.clamp(tom, 0.5, 1.6);
+        u.pitch = 1; // voz natural, sem alterar o tom
         u.rate = U.clamp((perfil.ritmo || 1) * 1.0, 0.7, 1.3);
         u.volume = A.volVoz;
         let fim = false;

@@ -34,12 +34,12 @@
   const nInsignias = () => ERS.MISSOES.filter((m) => J.insignias[m.id]).length;
 
   // ---------- utilidades de interface ----------
-  function toast(txt, tipo) {
+  function toast(txt, tipo, ms) {
     const d = document.createElement('div');
     d.className = 'toast ' + (tipo || '');
     d.textContent = txt;
     $('toasts').appendChild(d);
-    setTimeout(() => d.remove(), 3400);
+    setTimeout(() => d.remove(), ms || 3400);
   }
   function pulsar(id) { const el = $(id); if (!el) return; const c = el.closest('.chip') || el; c.classList.remove('pulsa'); void c.offsetWidth; c.classList.add('pulsa'); }
   function ganharPontos(n, motivo) {
@@ -365,8 +365,19 @@
       $('hud').hidden = false; $('caixa-minimapa').hidden = false;
       atualizarHUD(); atualizarPainel();
       A.musica(mapa.tema);
+      if (id === 'hub') setTimeout(avisarVozes, 1800);
       if (aoPronto) setTimeout(aoPronto, 250);
     }, 60);
+  }
+  // sem gravações e sem vozes naturais dos dois gêneros: indica o navegador que tem as vozes neurais
+  let avisouVozes = false;
+  function avisarVozes() {
+    if (avisouVozes || !A.vozLigada) return;
+    if (window.ERS_VOZES && Object.keys(window.ERS_VOZES).length) return;
+    const n = A.vozesNaturais();
+    if (n.F && n.M) return;
+    avisouVozes = true;
+    toast(n.F || n.M ? 'Algumas vozes não estão disponíveis neste navegador. Para ouvir todos os personagens com vozes neurais, abra o jogo no Microsoft Edge.' : 'Para ouvir as vozes neurais dos personagens, abra o jogo no navegador Microsoft Edge.', '', 9000);
   }
   function novoEstado(ms) {
     return { id: ms.id, creditos: ms.final ? 1000 : 250, desafios: {}, tentativas: {}, usadas: [], lotes: {}, problemas: {}, infos: {}, erros: 0, primeira: 0, pontos: 0, intro: false };
