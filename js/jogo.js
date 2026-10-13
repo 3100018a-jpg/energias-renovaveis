@@ -401,6 +401,7 @@
         e.bloqueada = ms.final && nInsignias() < ms.requer;
       }
       if (e.kind === 'info') e.lido = !!(J.hubInfos && J.hubInfos[e.ref]);
+      if (e.kind === 'arranjo') e.lido = !!(J.hubArranjos && J.hubArranjos[e.ref]);
     });
   }
 
@@ -464,6 +465,7 @@
       } else if (e.kind === 'npc' && e.papelJogo === 'desafio') {
         e.marcador = est.desafios[e.ref] ? 'feito' : 'desafio';
       } else if (e.kind === 'info') e.lido = !!est.infos[e.ref];
+      else if (e.kind === 'arranjo') e.lido = !!(est.arranjos && est.arranjos[e.ref]);
     });
     M.ordenarEstaticas();
   }
@@ -496,7 +498,9 @@
     if (e.kind === 'npc' && e.papelJogo === 'desafio' && ms.npcs[e.ref]) A.precarregar([{ texto: ms.npcs[e.ref].fala, perfil: ERS.VOZES[ms.npcs[e.ref].voz] }]);
     else if (e.kind === 'info' && ms.infos[e.ref]) A.precarregar([{ texto: ERS.falaInfo(ms.infos[e.ref]), perfil: ERS.VOZES[ms.narrador.voz] }]);
     else if (e.kind === 'problema') { const pb = ms.problemas.find((x) => x.id === e.ref); if (pb) A.precarregar([{ texto: ERS.falaProblema(pb), perfil: ERS.VOZES[ms.narrador.voz] }]); }
+    else if (e.kind === 'arranjo') { const a = arranjoDe(e); if (a) A.precarregar([{ texto: ERS.falaInfo(ERS.infoArranjo(a)), perfil: ERS.VOZES[ms.narrador.voz] }]); }
   });
+  function arranjoDe(e) { const l = ERS.ARRANJOS && ERS.ARRANJOS[J.local === 'hub' ? 'hub' : J.ms.id]; return l ? l[e.ref] : null; }
   ERS.bus.on('interagir', (e) => {
     if (dlgAtivo || modalAberto) return;
     M.jogador.caminho = [];
@@ -514,6 +518,9 @@
     } else if (e.kind === 'info') {
       const inf = ERS.HUB.infos[e.ref];
       abrirInfo(inf, quemNarrador(), () => { if (!e.lido) { e.lido = true; J.hubInfos = J.hubInfos || {}; J.hubInfos[e.ref] = 1; ganharPontos(20, 'curiosidade'); } });
+    } else if (e.kind === 'arranjo') {
+      const a = arranjoDe(e); if (!a) return;
+      abrirInfo(ERS.infoArranjo(a), quemNarrador(), () => { if (!e.lido) { e.lido = true; J.hubArranjos = J.hubArranjos || {}; J.hubArranjos[e.ref] = 1; ganharPontos(20, 'curiosidade'); } });
     }
   }
 
@@ -583,6 +590,13 @@
       dialogo([{ quem: q, texto: ms.npcs[e.ref].fala, escolhas: [{ rotulo: 'Aceitar o desafio', acao: () => abrirDesafio(e.ref, false, e) }, { rotulo: 'Depois', acao: null }] }]);
     } else if (e.kind === 'lote') abrirConstrucao(e);
     else if (e.kind === 'problema') abrirProblema(e);
+    else if (e.kind === 'arranjo') {
+      const a = arranjoDe(e); if (!a) return;
+      abrirInfo(ERS.infoArranjo(a), quemNarrador(), () => {
+        est.arranjos = est.arranjos || {};
+        if (!est.arranjos[e.ref]) { est.arranjos[e.ref] = true; e.lido = true; ganharPontos(20, 'curiosidade'); ganharCreditos(30); salvarEst(); checarConquistas(); }
+      });
+    }
     else if (e.kind === 'info') {
       abrirInfo(ms.infos[e.ref], quemNarrador(), () => {
         if (!est.infos[e.ref]) { est.infos[e.ref] = true; e.lido = true; ganharPontos(20, 'curiosidade'); ganharCreditos(30); salvarEst(); checarConquistas(); }
@@ -1046,6 +1060,7 @@
     else if (e.kind === 'lote') { t = e.rotulo; s = e.construido ? 'Construído · clique para ver' : 'Clique para construir'; }
     else if (e.kind === 'problema') { const pb = J.ms.problemas.find((x) => x.id === e.ref); t = pb.nome; s = e.resolvido ? 'Resolvido' : 'Problema ambiental'; }
     else if (e.kind === 'info') { t = 'Placa: Você sabia?'; s = 'Clique para ler'; }
+    else if (e.kind === 'arranjo') { const a = arranjoDe(e); t = a ? a.nome : 'Arranjo de energia limpa'; s = 'Arranjo de energia limpa · clique para conhecer'; }
     d.innerHTML = `${t}<small>${s}</small>`;
     d.style.left = h.x + 'px'; d.style.top = h.y + 'px';
     d.hidden = false;
@@ -1060,7 +1075,7 @@
     if (dlgAtivo || modalAberto || matchMedia('(pointer: coarse)').matches) { p.hidden = true; return; }
     const e = M.maisProximo();
     if (!e) { p.hidden = true; return; }
-    const verbo = e.kind === 'npc' ? 'Conversar com ' + e.nome : e.kind === 'pin' ? 'Abrir missão ' + missao(e.ref).nome : e.kind === 'lote' ? 'Construir: ' + e.rotulo : e.kind === 'problema' ? 'Ver problema' : 'Ler placa';
+    const verbo = e.kind === 'npc' ? 'Conversar com ' + e.nome : e.kind === 'pin' ? 'Abrir missão ' + missao(e.ref).nome : e.kind === 'lote' ? 'Construir: ' + e.rotulo : e.kind === 'problema' ? 'Ver problema' : e.kind === 'arranjo' ? 'Conhecer o arranjo limpo' : 'Ler placa';
     p.innerHTML = `<kbd>E</kbd>${verbo}`;
     p.hidden = false;
   });

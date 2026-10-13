@@ -97,17 +97,23 @@
     return out;
   }
   function estrada(m, pts) {
+    const tp = pts.map((p) => m.tile(p[0], p[1]));
+    let cam = [tp[0]];
+    for (let k = 1; k < tp.length; k++) cam = cam.concat(linha4(cam[cam.length - 1], tp[k]));
+    assentar(m, cam);
+  }
+  // assenta uma estrada sobre uma sequência de tiles vizinhos: cada travessia de rio vira
+  // uma ponte reta, perpendicular a um dos eixos, com cabeceiras retas e alinhadas nos dois lados
+  function assentar(m, cam) {
     const put = (x, y) => {
       if (!m.dentro(x, y)) return;
       const t = m.T(x, y);
       if (T.ehAgua(t)) m.set(x, y, T.PONTE, 1);
       else if (t !== T.PONTE) m.set(x, y, T.ESTRADA, Math.max(1, Math.min(m.H(x, y), 2)));
     };
-    const tp = pts.map((p) => m.tile(p[0], p[1]));
-    let cam = [tp[0]];
-    for (let k = 1; k < tp.length; k++) cam = cam.concat(linha4(cam[cam.length - 1], tp[k]));
-    // cada travessia de rio vira uma ponte reta, perpendicular a um dos eixos
     const agua = (q) => m.dentro(q[0], q[1]) && T.ehAgua(m.T(q[0], q[1]));
+    const terra = (q) => m.dentro(q[0], q[1]) && !T.ehAgua(m.T(q[0], q[1])) && !m.bloq[m.i(q[0], q[1])] && m.T(q[0], q[1]) !== T.LAVA;
+    const igual = (a, b) => a && b && a[0] === b[0] && a[1] === b[1];
     const fim = [cam[0]];
     for (let i = 1; i < cam.length; i++) {
       if (!agua(cam[i]) || agua(cam[i - 1])) { fim.push(cam[i]); continue; }
@@ -120,14 +126,237 @@
       let q = [A[0] + st[0], A[1] + st[1]];
       while (agua(q) && reta.length < 24) { reta.push(q); q = [q[0] + st[0], q[1] + st[1]]; }
       if (!reta.length || agua(q) || !m.dentro(q[0], q[1])) { for (let k = i; k <= j; k++) fim.push(cam[k]); i = j; continue; }
+      // cabeceira de entrada: o tile anterior também fica no eixo da ponte
+      const A0 = [A[0] - st[0], A[1] - st[1]];
+      if (terra(A0) && fim.length >= 2 && !igual(fim[fim.length - 2], A0)) {
+        fim.pop();
+        const ant = fim[fim.length - 1];
+        if (!igual(ant, A0)) linha4(ant, A0).filter((r) => !agua(r)).forEach((r) => fim.push(r));
+        fim.push(A);
+      }
       reta.forEach((r) => fim.push(r));
       fim.push(q);
-      // da cabeceira até retomar o traçado, por terra
-      const volta = linha4(q, B).filter((r) => !agua(r));
-      volta.forEach((r) => fim.push(r));
+      // cabeceira de saída: mais um tile reto antes de retomar o traçado
+      const q2 = [q[0] + st[0], q[1] + st[1]];
+      let ult = q;
+      if (terra(q2) && !igual(q2, B) && Math.abs(B[0] - q[0]) + Math.abs(B[1] - q[1]) > 1) { fim.push(q2); ult = q2; }
+      linha4(ult, B).filter((r) => !agua(r)).forEach((r) => fim.push(r));
       i = j;
     }
     fim.forEach((q) => put(q[0], q[1]));
+    return fim;
+  }
+
+  // ---------- rede viária: tudo ligado, sem trechos que terminam no nada ----------
+  const ehVia = (m, x, y) => m.dentro(x, y) && (m.T(x, y) === T.ESTRADA || m.T(x, y) === T.PONTE);
+  const D4 = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+  function grauVia(m, x, y) { let n = 0; D4.forEach((d) => { if (ehVia(m, x + d[0], y + d[1])) n++; }); return n; }
+  // tiles ocupados por pontos de interesse e construções (não podem virar estrada)
+  function mascaraOcupada(m) {
+    const oc = new Uint8Array(m.N * m.N);
+    m.ents.forEach((e) => {
+      if (e.kind === 'deco' && !e.fp) return;
+      const w = e.fp ? e.fp[0] : 1, d = e.fp ? e.fp[1] : 1, x0 = Math.floor(e.x), y0 = Math.floor(e.y);
+      for (let j = 0; j < d; j++) for (let i = 0; i < w; i++) if (m.dentro(x0 + i, y0 + j)) oc[m.i(x0 + i, y0 + j)] = e.spr === 'torreLinha' ? 2 : 1;
+    });
+    return oc;
+  }
+  function componentes(m) {
+    const N = m.N, comp = new Int32Array(N * N).fill(-1), tam = [];
+    for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
+      if (!ehVia(m, x, y) || comp[m.i(x, y)] >= 0) continue;
+      const id = tam.length; let n = 0; const fila = [[x, y]]; comp[m.i(x, y)] = id;
+      while (fila.length) {
+        const [cx, cy] = fila.pop(); n++;
+        D4.forEach((d) => { const nx = cx + d[0], ny = cy + d[1]; if (ehVia(m, nx, ny) && comp[m.i(nx, ny)] < 0) { comp[m.i(nx, ny)] = id; fila.push([nx, ny]); } });
+      }
+      tam.push(n);
+    }
+    return { comp, tam };
+  }
+  // caminho de menor custo por terra (rios viram pontes) entre um conjunto de origens e um alvo
+  function rotaEstrada(m, origens, ehAlvo, op) {
+    op = op || {};
+    const N = m.N, oc = op.oc || mascaraOcupada(m);
+    const custo = new Float32Array(N * N).fill(1e9), veio = new Int32Array(N * N).fill(-1), pAgua = new Uint8Array(N * N);
+    const heap = [];
+    const push = (i, f) => { heap.push([f, i]); let k = heap.length - 1; while (k > 0) { const p = (k - 1) >> 1; if (heap[p][0] <= heap[k][0]) break; [heap[p], heap[k]] = [heap[k], heap[p]]; k = p; } };
+    const pop = () => { const top = heap[0], u = heap.pop(); if (heap.length) { heap[0] = u; let k = 0; for (;;) { const a = 2 * k + 1, b = a + 1; let s = k; if (a < heap.length && heap[a][0] < heap[s][0]) s = a; if (b < heap.length && heap[b][0] < heap[s][0]) s = b; if (s === k) break; [heap[s], heap[k]] = [heap[k], heap[s]]; k = s; } } return top; };
+    origens.forEach((q) => { const i = m.i(q[0], q[1]); custo[i] = 0; push(i, 0); });
+    const limite = op.limite || 60;
+    let achou = -1;
+    while (heap.length) {
+      const [cst, cur] = pop();
+      if (cst > custo[cur]) continue;
+      if (cst > limite) break;
+      const cx = cur % N, cy = (cur / N) | 0;
+      if (custo[cur] > 0 && ehAlvo(cx, cy)) { achou = cur; break; }
+      for (const d of D4) {
+        const nx = cx + d[0], ny = cy + d[1];
+        if (!m.dentro(nx, ny)) continue;
+        const ni = m.i(nx, ny), t = m.tipo[ni];
+        const alvo = ehAlvo(nx, ny);
+        if (!alvo && (oc[ni] || (m.bloq[ni] && t !== T.ESTRADA && t !== T.PONTE))) continue;
+        const pimg = m.img(nx, ny);
+        if (pimg[0] < 0.01 || pimg[0] > 0.99 || pimg[1] < 0.01 || pimg[1] > 0.99) continue;
+        let c = 1, ag = 0;
+        if (t === T.ESTRADA || t === T.PONTE) c = 0.35;
+        else if (T.ehAgua(t)) {
+          if (t !== T.RIO && t !== T.REJEITO) continue;
+          c = 6; ag = pAgua[cur] + 1;
+          if (ag > (op.maxAgua || 7)) continue;
+        } else {
+          if (t === T.LAVA || !T.props[t].andavel) continue;
+          if (t === T.FLORESTA) c = 2.2; else if (t === T.ROCHA || t === T.MINA || t === T.ESTERIL || t === T.BASALTO) c = 3; else if (t === T.CANA || t === T.QUEIMADO || t === T.CINZA_VULC) c = 1.4;
+          const dh = Math.abs(m.alt[ni] - m.alt[cur]);
+          if (!T.ehAgua(m.tipo[cur]) && dh > 1) c += (dh - 1) * 5;
+        }
+        const nc = cst + c;
+        if (nc < custo[ni]) { custo[ni] = nc; veio[ni] = cur; pAgua[ni] = ag; push(ni, nc); }
+      }
+    }
+    if (achou < 0) return null;
+    const cam = [];
+    for (let k = achou; k >= 0; k = veio[k]) { cam.push([k % N, (k / N) | 0]); if (custo[k] === 0) break; }
+    return cam.reverse();
+  }
+  // liga ao núcleo principal (a cidade) os trechos de estrada que ficaram soltos
+  function conectarRede(m) {
+    const tentados = new Set();
+    for (let it = 0; it < 12; it++) {
+      const { comp, tam } = componentes(m);
+      if (tam.length <= 1) return;
+      let principal = 0; tam.forEach((n, k) => { if (n > tam[principal]) principal = k; });
+      let alvo = -1; tam.forEach((n, k) => { if (k !== principal && !tentados.has(k + ':' + n) && (alvo < 0 || n > tam[alvo])) alvo = k; });
+      if (alvo < 0) return;
+      tentados.add(alvo + ':' + tam[alvo]);
+      const origens = [];
+      for (let i = 0; i < comp.length; i++) if (comp[i] === alvo) origens.push([i % m.N, (i / m.N) | 0]);
+      const cam = rotaEstrada(m, origens, (x, y) => comp[m.i(x, y)] === principal, { limite: 70 });
+      if (cam && cam.length > 1) assentar(m, cam);
+    }
+  }
+  // comprimento do trecho sem saída, da ponta até o primeiro cruzamento
+  function trechoPonta(m, x, y) {
+    const lista = [[x, y]];
+    let ant = null, cur = [x, y];
+    for (let k = 0; k < 60; k++) {
+      const viz = D4.map((d) => [cur[0] + d[0], cur[1] + d[1]]).filter((q) => ehVia(m, q[0], q[1]) && !(ant && q[0] === ant[0] && q[1] === ant[1]));
+      if (viz.length !== 1) break;
+      ant = cur; cur = viz[0];
+      if (grauVia(m, cur[0], cur[1]) !== 2) break;
+      lista.push(cur);
+    }
+    return lista;
+  }
+  const DESTINOS = {
+    rural: ['fazenda', 'galpaoRural', 'silos', 'fazenda', 'curral'],
+    mata: ['mirante', 'galpaoRural', 'casa'],
+    praia: ['quiosque', 'casa', 'quiosque'],
+    mina: ['galpaoRural', 'caixaDagua'],
+    cidade: ['posto', 'casa', 'galpaoRural'],
+  };
+  function contextoPonta(m, x, y) {
+    const cont = {};
+    for (let dy = -3; dy <= 3; dy++) for (let dx = -3; dx <= 3; dx++) { if (!m.dentro(x + dx, y + dy)) continue; const t = m.T(x + dx, y + dy); cont[t] = (cont[t] || 0) + 1; }
+    const n = (...ts) => ts.reduce((s, t) => s + (cont[t] || 0), 0);
+    if (n(T.URBANO, T.PATIO) > 3) return 'cidade';
+    if (n(T.MINA, T.ESTERIL, T.RAMPA_MINA, T.TERRA) > 12) return 'mina';
+    if (n(T.AREIA, T.MANGUE) > 12) return 'praia';
+    if (n(T.FLORESTA, T.ROCHA) > 22) return 'mata';
+    return 'rural';
+  }
+  // cada ponta sem saída: ou leva a algum lugar, ou sai do mapa, ou fecha um anel, ou ganha
+  // um destino (sítio, galpão, posto, mirante...), ou é removida
+  function resolverPontas(m) {
+    const N = m.N;
+    const r = U.rng(m.seed + 91);
+    for (let rodada = 0; rodada < 3; rodada++) {
+      const oc = mascaraOcupada(m);
+      const destinoPerto = (x, y) => {
+        for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
+          const nx = x + dx, ny = y + dy;
+          if (!m.dentro(nx, ny) || (!dx && !dy)) continue;
+          const t = m.T(nx, ny);
+          if (t === T.URBANO || t === T.PATIO || t === T.CAIS) return true;
+          if (oc[m.i(nx, ny)] === 1) return true;
+        }
+        const p = m.img(x, y);
+        return p[0] < 0.02 || p[0] > 0.98 || p[1] < 0.02 || p[1] > 0.98;
+      };
+      const pontas = [];
+      for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) if (m.T(x, y) === T.ESTRADA && grauVia(m, x, y) === 1) pontas.push([x, y]);
+      if (!pontas.length) return;
+      let mudou = false;
+      pontas.forEach(([x, y]) => {
+        if (m.T(x, y) !== T.ESTRADA || grauVia(m, x, y) !== 1 || destinoPerto(x, y)) return;
+        const trecho = trechoPonta(m, x, y);
+        const nb = D4.map((d) => [x + d[0], y + d[1]]).find((q) => ehVia(m, q[0], q[1]));
+        const d = [x - nb[0], y - nb[1]];
+        const aparar = () => { trecho.forEach((q) => { if (m.T(q[0], q[1]) === T.ESTRADA && !destinoPerto(q[0], q[1])) { const viz = {}; D4.forEach((dd) => { const t = m.T(q[0] + dd[0], q[1] + dd[1]); if (!ehVia(m, q[0] + dd[0], q[1] + dd[1]) && !T.ehAgua(t) && t !== T.URBANO) viz[t] = (viz[t] || 0) + 1; }); let best = T.GRAMA, bn = 0; Object.keys(viz).forEach((k) => { if (viz[k] > bn) { bn = viz[k]; best = +k; } }); m.set(q[0], q[1], best); } }); mudou = true; };
+        // trechos curtinhos que sobram nas bordas da malha urbana: somem
+        if (trecho.length <= 2 && grauVia(m, nb[0], nb[1]) >= 3) { aparar(); return; }
+        // a) segue reto até a borda do mapa (estrada para outras cidades)
+        {
+          const cam = [];
+          let ok = false;
+          for (let k = 1; k <= 12; k++) {
+            const q = [x + d[0] * k, y + d[1] * k];
+            if (!m.dentro(q[0], q[1])) break;
+            const p = m.img(q[0], q[1]);
+            const t = m.T(q[0], q[1]);
+            if (oc[m.i(q[0], q[1])] || m.bloq[m.i(q[0], q[1])] || t === T.LAVA || (T.ehAgua(t) && t !== T.RIO)) break;
+            cam.push(q);
+            if (p[0] < -0.01 || p[0] > 1.01 || p[1] < -0.01 || p[1] > 1.01) { ok = true; break; }
+          }
+          if (ok) { assentar(m, [[x, y]].concat(cam)); mudou = true; return; }
+        }
+        // b) fecha um anel com outra estrada próxima (que não seja o próprio trecho)
+        {
+          const perto = new Set();
+          const fila = [[x, y, 0]]; perto.add(m.i(x, y));
+          while (fila.length) { const [cx, cy, k] = fila.shift(); if (k >= 14) continue; D4.forEach((dd) => { const nx = cx + dd[0], ny = cy + dd[1]; if (ehVia(m, nx, ny) && !perto.has(m.i(nx, ny))) { perto.add(m.i(nx, ny)); fila.push([nx, ny, k + 1]); } }); }
+          const cam = rotaEstrada(m, [[x, y]], (ax, ay) => ehVia(m, ax, ay) && !perto.has(m.i(ax, ay)), { limite: 16, oc, maxAgua: 5 });
+          if (cam && cam.length > 2 && cam.length <= 16) { assentar(m, cam); mudou = true; return; }
+        }
+        // c) um destino no fim da estrada
+        {
+          const lista = DESTINOS[contextoPonta(m, x, y)];
+          const cand = [[x + d[0], y + d[1]], [x + d[1], y + d[0]], [x - d[1], y - d[0]]];
+          for (const q of cand) {
+            if (!m.dentro(q[0], q[1]) || oc[m.i(q[0], q[1])] || ehVia(m, q[0], q[1])) continue;
+            if (!m.livre(q[0], q[1], 1, 1) || Math.abs(m.H(q[0], q[1]) - m.H(x, y)) > 1) continue;
+            const t = m.T(q[0], q[1]);
+            if (t === T.CANA) m.set(q[0], q[1], T.TERRA);
+            m.ents = m.ents.filter((e) => !(e.kind === 'deco' && !e.fp && Math.floor(e.x) === q[0] && Math.floor(e.y) === q[1]));
+            const e = ed(m, r.pick(lista), q[0], q[1], [1, 1], r.int(0, 5));
+            if (e) { e.extra = true; e.destino = true; return; }
+          }
+        }
+        // d) sem destino possível: remove o trecho vazio
+        aparar();
+      });
+      if (!mudou) return;
+    }
+  }
+  // corredor da estrada: o terreno ao lado acompanha o nível da pista (cortes e aterros
+  // suaves), sem barrancos atravessando a estrada
+  function nivelarCorredor(m) {
+    const N = m.N, oc = mascaraOcupada(m);
+    const H0 = Int8Array.from(m.alt);
+    for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
+      if (!ehVia(m, x, y)) continue;
+      const hv = H0[m.i(x, y)];
+      for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
+        const nx = x + dx, ny = y + dy;
+        if ((!dx && !dy) || !m.dentro(nx, ny)) continue;
+        const ni = m.i(nx, ny), t = m.tipo[ni];
+        if (ehVia(m, nx, ny) || T.ehAgua(t) || m.bloq[ni] || oc[ni] || t === T.LAVA || t === T.CAIS) continue;
+        const hn = m.alt[ni];
+        if (hn === hv + 1 || hn === hv - 1) m.alt[ni] = hv;
+        else if (hn > hv + 1) m.alt[ni] = hn - 1;
+      }
+    }
   }
   // suaviza degraus de estrada (evita degraus > 1)
   function suavizarEstradas(m) {
@@ -159,37 +388,72 @@
     const r = m.r;
     (m._cid || []).forEach((a) => cidade(m, a[0], a[1], a[2], a[3], Object.assign({}, a[4], { agora: true, soPredios: true })));
     m._cid = [];
+    const tropical = op.tropical !== false;
+    // beira de rio: vizinho (8 direções) com água corrente ou lago
+    const beiraRio = (x, y) => { for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) { if (!dx && !dy) continue; const t = m.T(x + dx, y + dy); if (t === T.RIO || t === T.LAGO_CAVA) return true; } return false; };
+    const margemDegradada = (x) => { if (!m.margens) return false; const p = m.img(x[0], x[1]); return p[0] > m.margens.ix0 && p[0] < m.margens.ix1; };
+    const pertoVia = (x, y) => { for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) { const t = m.T(x + dx, y + dy); if (m.dentro(x + dx, y + dy) && (t === T.PONTE || t === T.ESTRADA)) return true; } return false; };
     for (let y = 0; y < m.N; y++) for (let x = 0; x < m.N; x++) {
-      if (m.bloq[m.i(x, y)]) continue;
+      if (m.bloq[m.i(x, y)] || (m.semArvore && m.semArvore[m.i(x, y)])) continue;
       const t = m.T(x, y), h = m.H(x, y);
       const p = m.img(x, y);
       if (p[1] < -0.06 || p[1] > 1.05 || p[0] < -0.05 || p[0] > 1.05) continue;
       const j = () => r.range(-0.28, 0.28);
+      // mata ciliar e plantas de beira d'água (juncos, capim alto, buritis)
+      if (op.margens !== false && (t === T.GRAMA || t === T.PASTO || t === T.VARZEA || t === T.GRAMA_SECA || t === T.CERRADO) && beiraRio(x, y) && !margemDegradada([x, y])) {
+        const q = r();
+        if (q < 0.34) { deco(m, r() < 0.6 ? 'junco' : 'capim', x + 0.5 + j(), y + 0.5 + j(), r.int(0, 3)); if (r() < 0.4) deco(m, 'junco', x + 0.5 + j(), y + 0.5 + j(), r.int(0, 3)); continue; }
+        if (q < 0.56 && !pertoVia(x, y)) { deco(m, tropical && r() < 0.25 ? 'buriti' : r() < 0.2 ? 'ipe' : 'arvore', x + 0.5 + j(), y + 0.5 + j(), r.int(0, 5)); continue; }
+        if (q < 0.66) { deco(m, 'arbusto', x + 0.5 + j(), y + 0.5 + j(), r.int(0, 5)); continue; }
+      }
       if (t === T.FLORESTA) {
         const n = op.densFloresta || 1;
         for (let k = 0; k < n; k++) {
           if (k && r() > 0.45) continue;
-          const tipo = h >= 4 ? (r() < 0.6 ? 'pinheiro' : 'araucaria') : op.tropical === false ? (r() < 0.7 ? 'arvore' : 'pinheiro') : r() < 0.62 ? 'tropical' : 'arvore';
+          let tipo = h >= 4 ? (r() < 0.6 ? 'pinheiro' : 'araucaria') : !tropical ? (r() < 0.7 ? 'arvore' : 'pinheiro') : r() < 0.62 ? 'tropical' : 'arvore';
+          if (h < 4 && r() < 0.05) tipo = 'ipe';
+          if (tropical && h < 4 && beiraRio(x, y) && r() < 0.35) tipo = 'buriti';
           deco(m, tipo, x + 0.5 + j(), y + 0.5 + j(), r.int(0, 5));
         }
       } else if (t === T.AGROFLORESTA) {
         if (r() < 0.75) deco(m, r.pick(['bananeira', 'cafe', 'arvore', 'cafe', 'tropical']), x + 0.5 + j(), y + 0.5 + j(), r.int(0, 5));
       } else if (t === T.GRAMA) {
-        if (r() < (op.densGrama || 0.06)) deco(m, r() < 0.7 ? 'arvore' : 'arbusto', x + 0.5 + j(), y + 0.5 + j(), r.int(0, 5));
-        else if (r() < 0.03) deco(m, 'pedra', x + 0.5 + j(), y + 0.5 + j(), r.int(0, 2));
+        const q = r();
+        if (q < (op.densGrama || 0.06)) deco(m, r() < 0.12 ? 'ipe' : r() < 0.72 ? 'arvore' : 'arbusto', x + 0.5 + j(), y + 0.5 + j(), r.int(0, 5));
+        else if (q < (op.densGrama || 0.06) + 0.025) deco(m, 'pedra', x + 0.5 + j(), y + 0.5 + j(), r.int(0, 2));
+        else if (q < (op.densGrama || 0.06) + 0.06) deco(m, 'capim', x + 0.5 + j(), y + 0.5 + j(), r.int(0, 3));
+        else if (q < (op.densGrama || 0.06) + 0.075) deco(m, 'flores', x + 0.5 + j(), y + 0.5 + j(), r.int(0, 3));
+      } else if (t === T.CERRADO) {
+        const q = r();
+        if (q < 0.1) deco(m, 'cerradoArvore', x + 0.5 + j(), y + 0.5 + j(), r.int(0, 3));
+        else if (q < 0.2) deco(m, 'capim', x + 0.5 + j(), y + 0.5 + j(), 3);
+        else if (q < 0.24) deco(m, 'cupinzeiro', x + 0.5 + j(), y + 0.5 + j(), r.int(0, 2));
+        else if (q < 0.27) deco(m, 'ipe', x + 0.5 + j(), y + 0.5 + j(), 0);
+      } else if (t === T.VARZEA) {
+        const q = r();
+        if (q < 0.18) deco(m, 'junco', x + 0.5 + j(), y + 0.5 + j(), r.int(0, 3));
+        else if (q < 0.26) deco(m, tropical ? 'buriti' : 'arvore', x + 0.5 + j(), y + 0.5 + j(), r.int(0, 5));
       } else if (t === T.ROCHA) {
-        if (r() < 0.1) deco(m, 'pedra', x + 0.5 + j(), y + 0.5 + j(), r.int(0, 2));
-        else if (r() < 0.08 && h < 8) deco(m, 'pinheiro', x + 0.5 + j(), y + 0.5 + j(), r.int(0, 2));
+        const q = r();
+        if (q < 0.07) deco(m, 'rochedo', x + 0.5 + j(), y + 0.5 + j(), r.int(0, 3));
+        else if (q < 0.15) deco(m, 'pedra', x + 0.5 + j(), y + 0.5 + j(), r.int(0, 2));
+        else if (q < 0.23 && h < 8) deco(m, 'pinheiro', x + 0.5 + j(), y + 0.5 + j(), r.int(0, 2));
+      } else if (t === T.BASALTO || t === T.CINZA_VULC) {
+        if (r() < 0.05) deco(m, 'rochedo', x + 0.5 + j(), y + 0.5 + j(), 3);
+      } else if (t === T.ESTERIL) {
+        if (r() < 0.04) deco(m, 'pedra', x + 0.5 + j(), y + 0.5 + j(), r.int(0, 2));
       } else if (t === T.AREIA) {
         if (r() < (op.densPalma || 0.05)) deco(m, 'palmeira', x + 0.5 + j(), y + 0.5 + j(), r.int(0, 3));
       } else if (t === T.PASTO) {
-        if (r() < 0.025) deco(m, 'arvore', x + 0.5 + j(), y + 0.5 + j(), r.int(0, 5));
+        if (r() < 0.025) deco(m, r() < 0.2 ? 'ipe' : 'arvore', x + 0.5 + j(), y + 0.5 + j(), r.int(0, 5));
+        else if (r() < 0.03) deco(m, 'capim', x + 0.5 + j(), y + 0.5 + j(), r.int(0, 3));
       } else if (t === T.QUEIMADO) {
         if (r() < 0.55) deco(m, r() < 0.8 ? 'queimada' : 'toco', x + 0.5 + j(), y + 0.5 + j(), r.int(0, 3));
       } else if (t === T.MANGUE) {
         if (r() < 0.5) deco(m, 'arbusto', x + 0.5 + j(), y + 0.5 + j(), 0);
       } else if (t === T.GRAMA_SECA) {
         if (r() < 0.03) deco(m, 'toco', x + 0.5 + j(), y + 0.5 + j(), 0);
+        else if (r() < 0.04) deco(m, 'capim', x + 0.5 + j(), y + 0.5 + j(), 3);
       }
     }
   }
@@ -243,7 +507,7 @@
       return true;
     };
     let vis = bfs();
-    const alvos = m.ents.filter((e) => ['npc', 'lote', 'problema', 'info', 'pin'].indexOf(e.kind) >= 0);
+    const alvos = m.ents.filter((e) => ['npc', 'lote', 'problema', 'info', 'pin', 'arranjo'].indexOf(e.kind) >= 0);
     alvos.forEach((e) => {
       if (anel(e).some((t) => vis[m.i(t[0], t[1])])) return;
       // caminho de menor custo (Dijkstra) dos tiles alcançados até o anel do alvo:
@@ -345,18 +609,251 @@
     }
     return [x0, y0];
   }
-  // barragem ao longo do eixo x do tile, com lago atrás (y menor) e rio à frente
+  // barragem ao longo do eixo x do tile, com lago atrás (y menor) e rio à frente:
+  // vertedouro com comportas no meio, tomada d'água num dos lados e ombreiras de rocha
   function represa(m, ix, iy, meio, hLago) {
     const c = m.tile(ix, iy);
     for (let i = -meio; i <= meio; i++) {
       const x = c[0] + i, y = c[1];
       m.set(x, y, T.PATIO, hLago + 1); m.ocupar(x, y, 1, 1);
-      deco(m, 'barragem', x, y, i === 0 ? 2 : 0, { fp: [1, 1] });
+      const v = Math.abs(i) <= (meio >= 3 ? 1 : 0) ? 2 : i === meio ? 4 : 0;
+      deco(m, 'barragem', x, y, v, { fp: [1, 1] });
       for (let k = 1; k <= 4; k++) { if (T.ehAgua(m.T(x, y - k))) m.setH(x, y - k, hLago); else if (k <= 2) m.set(x, y - k, T.RIO, hLago); }
+      // bacia de dissipação logo abaixo do vertedouro (água branca)
+      if (v === 2 && T.ehAgua(m.T(x, y + 1))) (m.vapor = m.vapor || []).push([x, y + 1, 'vapor', 0.9]);
     }
-    // ombreiras
-    [c[0] - meio - 1, c[0] + meio + 1].forEach((x) => { if (m.H(x, c[1]) < hLago + 1) m.set(x, c[1], T.ROCHA, hLago + 1); });
+    // entorno livre de árvores (crista, ombreiras e pé da barragem ficam à vista)
+    m.semArvore = m.semArvore || new Uint8Array(m.N * m.N);
+    for (let y = c[1] - 2; y <= c[1] + 3; y++) for (let x = c[0] - meio - 3; x <= c[0] + meio + 3; x++) if (m.dentro(x, y)) m.semArvore[m.i(x, y)] = 1;
+    // ombreiras de rocha nas encostas, na altura da crista
+    [c[0] - meio - 1, c[0] + meio + 1].forEach((x, k) => {
+      for (let j = -1; j <= 1; j++) { const y = c[1] + j; if (!m.dentro(x, y) || T.ehAgua(m.T(x, y))) continue; if (m.H(x, y) < hLago + 1 || j === 0) m.set(x, y, T.ROCHA, hLago + 1); }
+      const x2 = x + (k ? 1 : -1); if (m.dentro(x2, c[1]) && !T.ehAgua(m.T(x2, c[1])) && m.H(x2, c[1]) < hLago) m.set(x2, c[1], T.ROCHA, hLago);
+    });
     return c;
+  }
+
+  // ---------- vulcão: cone com cratera, borda, lago de lava, derrames e fumarolas ----------
+  function vulcao(m, cx, cy, rx, ry, op) {
+    op = op || {};
+    const hMax = op.hMax || 12, r = U.rng(m.seed + 313);
+    const fum = [];
+    zona(m, cx, cy, rx, ry, (x, y, d) => {
+      if (T.ehAgua(m.T(x, y)) && d > 0.3) return;
+      let h, t;
+      if (d < 0.1) { h = hMax - 2; t = d < 0.07 ? T.LAVA : T.CINZA_VULC; }            // fundo da cratera
+      else if (d < 0.19) { h = hMax; t = m.ruido(x * 0.5, y * 0.5) > 0.62 ? T.ROCHA : T.CINZA_VULC; } // borda
+      else {
+        const k = Math.pow((1 - d) / 0.81, 1.25);
+        h = Math.max(1, Math.round(1 + (hMax - 1) * k));
+        const n = m.ruido.fbm(x * 0.16, y * 0.16, 3);
+        if (d < 0.46) t = n > 0.66 ? T.ROCHA : T.CINZA_VULC;
+        else if (d < 0.7) t = n > 0.55 ? T.CINZA_VULC : n > 0.38 ? T.ROCHA : T.CERRADO;
+        else t = n > 0.58 ? T.FLORESTA : n > 0.42 ? T.CERRADO : (op.solo || T.GRAMA);
+      }
+      m.set(x, y, t, Math.max(d < 0.19 ? 0 : m.H(x, y) * (d > 0.85 ? 1 : 0), h));
+    }, 0.12);
+    const ponto = (ang, d) => [cx + Math.cos(ang) * rx * d, cy + Math.sin(ang) * ry * d];
+    // derrames antigos de basalto descendo as encostas
+    (op.derrames || [0.6, 2.2, 3.6]).forEach((a0, k) => {
+      let ang = a0;
+      for (let d = 0.2; d < (k === 0 ? 0.92 : 0.8); d += 0.015) {
+        ang += (m.ruido(d * 8 + k * 3, k) - 0.5) * 0.08;
+        const t = m.tile(...ponto(ang, d));
+        const larg = d < 0.5 ? 1 : 2;
+        for (let j = 0; j < larg; j++) for (let i = 0; i < larg; i++) { const x = t[0] + i, y = t[1] + j; if (m.dentro(x, y) && !T.ehAgua(m.T(x, y)) && m.T(x, y) !== T.LAVA) m.set(x, y, T.BASALTO); }
+      }
+    });
+    // derrame ativo: um canal de lava incandescente que transborda da cratera
+    if (op.lavaAtiva !== false) {
+      let ang = op.angLava === undefined ? 1.3 : op.angLava;
+      for (let d = 0.09; d < 0.5; d += 0.012) {
+        ang += (m.ruido(d * 10, 9) - 0.5) * 0.06;
+        const t = m.tile(...ponto(ang, d));
+        if (m.dentro(t[0], t[1])) m.set(t[0], t[1], T.LAVA);
+        const t2 = [t[0] + 1, t[1]];
+        if (d > 0.3 && m.dentro(t2[0], t2[1]) && m.T(t2[0], t2[1]) !== T.LAVA) m.set(t2[0], t2[1], T.BASALTO);
+      }
+    }
+    // fumarolas com crosta de enxofre
+    (op.fumarolas || [[0.3, 2.6], [0.36, 0.2], [0.28, 4.4]]).forEach((f) => {
+      const t = m.tile(...ponto(f[1], f[0]));
+      for (let j = -1; j <= 1; j++) for (let i = -1; i <= 1; i++) { const x = t[0] + i, y = t[1] + j; if (m.dentro(x, y) && ((!i && !j) || r() < 0.22) && m.T(x, y) !== T.LAVA && !T.ehAgua(m.T(x, y))) m.set(x, y, T.ENXOFRE); }
+      fum.push([t[0], t[1], 'vapor', 1.6]);
+    });
+    const cr = m.tile(cx, cy);
+    m.vapor = (m.vapor || []).concat([[cr[0], cr[1], 'escura', 3], [cr[0] + 1, cr[1], 'vapor', 1.4]], fum);
+    m._vulcao = { cx, cy, rx, ry };
+    return cr;
+  }
+
+  // ---------- cava de mineração em bancadas, com rampa espiral, lago e pilha de estéril ----------
+  function cava(m, cx, cy, rx, ry, op) {
+    op = op || {};
+    const niv = op.niveis || 4, h0 = op.h0 === undefined ? 1 : op.h0;
+    zona(m, cx, cy, rx, ry, (x, y, d) => {
+      const b = Math.min(niv, Math.floor((1 - d) * (niv + 0.7)));
+      if (op.lago !== false && d < 0.17) m.set(x, y, T.LAGO_CAVA, h0 - niv - 1);
+      else m.set(x, y, T.MINA, h0 - b);
+    }, op.irr === undefined ? 0.12 : op.irr);
+    // rampa: estrada de serviço em espiral, da borda até o fundo
+    const rampa = [];
+    let ang = op.angRampa === undefined ? 0.4 : op.angRampa;
+    for (let rho = 1.02; rho > 0.24; rho -= 0.006) {
+      ang += 0.034;
+      const t = m.tile(cx + Math.cos(ang) * rx * rho, cy + Math.sin(ang) * ry * rho);
+      if (!m.dentro(t[0], t[1]) || T.ehAgua(m.T(t[0], t[1]))) continue;
+      if (!rampa.length || rampa[rampa.length - 1][0] !== t[0] || rampa[rampa.length - 1][1] !== t[1]) rampa.push(t);
+    }
+    // garante continuidade (vizinhos por lado) e degraus de no máximo 1 nível
+    const cont = [rampa[0]];
+    for (let i = 1; i < rampa.length; i++) cont.push(...linha4(cont[cont.length - 1], rampa[i]));
+    cont.forEach((t, i) => {
+      if (T.ehAgua(m.T(t[0], t[1]))) return;
+      if (i > 0) { const p = cont[i - 1]; const hp = m.H(p[0], p[1]); m.setH(t[0], t[1], U.clamp(m.H(t[0], t[1]), hp - 1, hp + 1)); }
+      m.set(t[0], t[1], T.RAMPA_MINA);
+    });
+    m._rampa = cont;
+    // pilha de estéril (rocha sem minério) em degraus, com o topo plano
+    if (op.esteril) {
+      const e = op.esteril;
+      zona(m, e[0], e[1], e[2], e[3], (x, y, d) => {
+        if (T.ehAgua(m.T(x, y)) || m.T(x, y) === T.MINA || m.T(x, y) === T.RAMPA_MINA) return;
+        m.set(x, y, d > 0.8 ? T.GRAMA_SECA : T.ESTERIL, Math.max(1, h0 + 1 + Math.min(2, Math.floor((1 - d) * 3.2))));
+      }, 0.15);
+    }
+    m._cava = { cx, cy, rx, ry, niv, h0 };
+  }
+  // máquinas trabalhando na cava: escavadeira no fundo, caminhões na rampa, perfuratriz na bancada
+  function maquinasCava(m) {
+    const cv = m._cava; if (!cv) return;
+    const rp = m._rampa || [];
+    const pos = (ang, rho) => m.tile(cv.cx + Math.cos(ang) * cv.rx * rho, cv.cy + Math.sin(ang) * cv.ry * rho);
+    const solta = (spr, t, v, extra) => { if (!t || !m.dentro(t[0], t[1]) || m.bloq[m.i(t[0], t[1])] || T.ehAgua(m.T(t[0], t[1]))) return; deco(m, spr, t[0] + 0.5, t[1] + 0.5, v || 0, extra); };
+    [0.25, 0.55, 0.8].forEach((f, i) => { const t = rp[Math.floor(rp.length * f)]; if (t) solta('caminhaoMina', t, i); });
+    solta('escavadeira', pos(2.6, 0.3), 1);
+    solta('escavadeira', pos(4.6, 0.55), 0);
+    solta('perfuratriz', pos(3.6, 0.78), 0);
+    solta('perfuratriz', pos(5.4, 0.5), 1);
+    solta('caminhaoPipa', pos(1.2, 0.7), 0);
+  }
+
+  // ---------- várzea: campos úmidos que acompanham o rio ----------
+  function varzeas(m, op) {
+    op = op || {};
+    const N = m.N, dist = new Uint8Array(N * N).fill(9);
+    for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) if (m.T(x, y) === T.RIO) dist[m.i(x, y)] = 0;
+    for (let pass = 0; pass < 2; pass++) for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
+      if (dist[m.i(x, y)] <= pass) continue;
+      if (D4.some((d) => m.dentro(x + d[0], y + d[1]) && dist[m.i(x + d[0], y + d[1])] === pass)) dist[m.i(x, y)] = pass + 1;
+    }
+    for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
+      const k = dist[m.i(x, y)];
+      if (k < 1 || k > (op.larg || 2) || m.bloq[m.i(x, y)]) continue;
+      const t = m.T(x, y);
+      if ((t === T.GRAMA || t === T.PASTO) && m.ruido(x * 0.22 + 4, y * 0.22) > (op.limiar || 0.45) && m.H(x, y) <= 2) m.set(x, y, T.VARZEA);
+    }
+  }
+
+  // ---------- pastagens cercadas, com cupinzeiros, cocho e bebedouro ----------
+  function pastagens(m, tipo) {
+    const N = m.N, r = U.rng(m.seed + 57), TP = tipo === undefined ? T.PASTO : tipo;
+    const ehPasto = (x, y) => m.dentro(x, y) && m.T(x, y) === TP;
+    let soma = [0, 0, 0];
+    for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
+      if (!ehPasto(x, y)) continue;
+      const p = m.img(x, y);
+      if (p[0] < 0 || p[0] > 1 || p[1] < 0 || p[1] > 1) continue;
+      soma[0] += x; soma[1] += y; soma[2]++;
+      // cerca nas divisas com outros usos (com porteira onde passa a estrada)
+      [[0, 1, 0, 0.97], [0, -1, 0, 0.03], [1, 0, 1, 0.97], [-1, 0, 1, 0.03]].forEach((q) => {
+        const nx = x + q[0], ny = y + q[1];
+        if (ehPasto(nx, ny) || !m.dentro(nx, ny)) return;
+        const tn = m.T(nx, ny);
+        if (tn === T.ESTRADA || tn === T.PONTE || T.ehAgua(tn) || Math.abs(m.H(nx, ny) - m.H(x, y)) > 1) return;
+        const fx = q[2] ? x + q[3] : x + 0.5, fy = q[2] ? y + 0.5 : y + q[3];
+        deco(m, 'cerca', fx, fy, q[2], { profExtra: -0.02 });
+      });
+      if (!m.bloq[m.i(x, y)] && r() < 0.035) deco(m, 'cupinzeiro', x + r.range(0.25, 0.75), y + r.range(0.25, 0.75), r.int(0, 2));
+    }
+    if (soma[2] > 20) {
+      const cx = Math.round(soma[0] / soma[2]), cy = Math.round(soma[1] / soma[2]);
+      const lugar = acharPerto(m, cx, cy, 1, 1, { tipos: [TP], raio: 5 });
+      if (lugar) deco(m, 'cocho', lugar[0] + 0.5, lugar[1] + 0.5, 0);
+      const l2 = acharPerto(m, cx + 2, cy + 1, 1, 1, { tipos: [TP], raio: 5 });
+      if (l2) deco(m, 'cocho', l2[0] + 0.5, l2[1] + 0.5, 1);
+    }
+  }
+
+  // procura, em espiral a partir de (x, y), um terreno livre e plano para uma construção
+  function acharPerto(m, x, y, w, d, op) {
+    op = op || {};
+    const raio = op.raio || 6;
+    for (let r = 0; r <= raio; r++) for (let dy = -r; dy <= r; dy++) for (let dx = -r; dx <= r; dx++) {
+      if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue;
+      const tx = x + dx, ty = y + dy;
+      if (!m.livre(tx, ty, w, d)) continue;
+      let ok = true;
+      const h0 = m.H(tx, ty);
+      for (let j = 0; j < d && ok; j++) for (let i = 0; i < w && ok; i++) {
+        const t = m.T(tx + i, ty + j);
+        if (t === T.ESTRADA || t === T.LAVA || t === T.RAMPA_MINA || Math.abs(m.H(tx + i, ty + j) - h0) > 1) ok = false;
+        if (op.tipos && op.tipos.indexOf(t) < 0) ok = false;
+      }
+      if (ok) return [tx, ty];
+    }
+    return null;
+  }
+  // implemento ou construção perto de um ponto (coords de imagem), sem ocupar estrada nem pontos do jogo
+  function implemento(m, spr, ix, iy, fp, v, op) {
+    fp = fp || [1, 1];
+    const t = m.tile(ix, iy);
+    const lugar = acharPerto(m, t[0], t[1], fp[0], fp[1], op);
+    if (!lugar) return null;
+    m.ents = m.ents.filter((e) => !(e.kind === 'deco' && !e.fp && e.x >= lugar[0] && e.x < lugar[0] + fp[0] && e.y >= lugar[1] && e.y < lugar[1] + fp[1]));
+    for (let j = 0; j < fp[1]; j++) for (let i = 0; i < fp[0]; i++) if (m.T(lugar[0] + i, lugar[1] + j) === T.CANA || m.T(lugar[0] + i, lugar[1] + j) === T.FLORESTA) m.set(lugar[0] + i, lugar[1] + j, T.TERRA);
+    return ed(m, spr, lugar[0], lugar[1], fp, v || 0, op && op.extra);
+  }
+  // máquina solta (sem pegada) num tile livre perto do ponto
+  function maquina(m, spr, ix, iy, v, op) {
+    const t = m.tile(ix, iy);
+    const lugar = acharPerto(m, t[0], t[1], 1, 1, op);
+    if (!lugar) return null;
+    return deco(m, spr, lugar[0] + 0.5, lugar[1] + 0.5, v || 0);
+  }
+  // correia transportadora entre dois pontos (coords de imagem), em segmentos sobre cavaletes
+  function correiaEntre(m, a, b) {
+    const ta = m.tile(a[0], a[1]), tb = m.tile(b[0], b[1]);
+    const cam = [ta].concat(linha4(ta, tb));
+    cam.forEach((t, i) => {
+      if (!m.dentro(t[0], t[1]) || m.bloq[m.i(t[0], t[1])] || T.ehAgua(m.T(t[0], t[1])) || m.T(t[0], t[1]) === T.ESTRADA) return;
+      const n = cam[i + 1] || cam[i - 1];
+      deco(m, 'correia', t[0] + 0.5, t[1] + 0.5, n && n[0] !== t[0] ? 0 : 1);
+    });
+  }
+  // canoas e barcos de pesca no rio
+  function canoas(m, pts) {
+    pts.forEach((p, i) => { const t = m.tile(p[0], p[1]); if (m.T(t[0], t[1]) === T.RIO && !m.bloq[m.i(t[0], t[1])]) deco(m, 'canoa', t[0] + 0.5, t[1] + 0.5, i, { agua: true, h: m.H(t[0], t[1]) }); });
+  }
+  // arranjos de energia limpa já instalados no mapa: construções visitáveis que mostram
+  // como combinar fontes limpas para enfrentar um problema do lugar
+  function arranjos(m, id, posicoes) {
+    const lista = (ERS.ARRANJOS && ERS.ARRANJOS[id]) || [];
+    lista.forEach((a, k) => {
+      const p = posicoes[k]; if (!p) return;
+      const t = m.tile(p[0], p[1]);
+      const lugar = acharPerto(m, t[0], t[1], 2, 2, { raio: 7 });
+      if (!lugar) return;
+      m.ents = m.ents.filter((e) => !(e.kind === 'deco' && !e.fp && e.x >= lugar[0] - 0.2 && e.x < lugar[0] + 2.2 && e.y >= lugar[1] - 0.2 && e.y < lugar[1] + 2.2));
+      const h = Math.max(1, m.H(lugar[0], lugar[1]));
+      m.nivelar(lugar[0], lugar[1], 2, 2, h);
+      for (let j = 0; j < 2; j++) for (let i = 0; i < 2; i++) { const tt = m.T(lugar[0] + i, lugar[1] + j); if (tt === T.CANA || tt === T.FLORESTA || tt === T.ROCHA) m.set(lugar[0] + i, lugar[1] + j, T.GRAMA); }
+      m.ent({ kind: 'arranjo', ref: k, spr: a.spr, x: lugar[0], y: lugar[1], fp: [2, 2], v: a.v || 0 });
+      // entorno sem árvores altas, para o arranjo ficar à vista
+      m.semArvore = m.semArvore || new Uint8Array(m.N * m.N);
+      for (let j = -1; j <= 3; j++) for (let i = -1; i <= 3; i++) if (m.dentro(lugar[0] + i, lugar[1] + j)) m.semArvore[m.i(lugar[0] + i, lugar[1] + j)] = 1;
+      m.ocupar(lugar[0], lugar[1], 2, 2);
+    });
   }
   function linhaTransmissao(m, pts) {
     const tps = [];
@@ -370,6 +867,27 @@
 
   // conteúdo de missão (narrador, NPCs, lotes, problemas, placas)
   function conteudo(m, ms, pos) {
+    // pontos do jogo nunca cortam estradas nem pontes: se a posição cair sobre a via,
+    // vão para o terreno livre mais próximo
+    const naVia = (x, y, fp) => { for (let j = 0; j < fp[1]; j++) for (let i = 0; i < fp[0]; i++) { const t = m.T(x + i, y + j); if (t === T.ESTRADA || t === T.PONTE) return true; } return false; };
+    const tileLivre = (p, fp) => {
+      fp = fp || [1, 1];
+      const t = m.tile(p[0], p[1]);
+      if (!naVia(t[0], t[1], fp)) return t;
+      for (let r = 1; r <= 6; r++) for (let dy = -r; dy <= r; dy++) for (let dx = -r; dx <= r; dx++) {
+        if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue;
+        const x = t[0] + dx, y = t[1] + dy;
+        let ok = true;
+        for (let j = 0; j < fp[1] && ok; j++) for (let i = 0; i < fp[0] && ok; i++) {
+          const xx = x + i, yy = y + j;
+          if (!m.dentro(xx, yy) || m.bloq[m.i(xx, yy)]) { ok = false; break; }
+          const tt = m.T(xx, yy);
+          if (tt === T.ESTRADA || tt === T.PONTE || T.ehAgua(tt) || tt === T.LAVA || Math.abs(m.H(xx, yy) - m.H(x, y)) > 1) ok = false;
+        }
+        if (ok) return [x, y];
+      }
+      return t;
+    };
     const preparar = (x, y, fp) => {
       fp = fp || [1, 1];
       const h = Math.max(1, m.H(x, y));
@@ -381,7 +899,7 @@
       }
     };
     // narrador
-    const tn = m.tile(pos.narrador[0], pos.narrador[1]);
+    const tn = tileLivre(pos.narrador);
     preparar(tn[0], tn[1]);
     const nar = ms.narrador;
     m.ent({ kind: 'npc', papelJogo: 'narrador', x: tn[0] + 0.5, y: tn[1] + 0.5, nome: nar.nome, papel: nar.papel, voz: nar.voz, look: ERS.LOOKS[nar.look], marcador: 'narrador' });
@@ -389,7 +907,7 @@
     marcarNpc(m, tn[0], tn[1]);
     (ms.npcs || []).forEach((n, i) => {
       const p = pos.npcs[i]; if (!p) return;
-      const t = m.tile(p[0], p[1]);
+      const t = tileLivre(p);
       preparar(t[0], t[1]);
       m.ent({ kind: 'npc', papelJogo: 'desafio', ref: i, x: t[0] + 0.5, y: t[1] + 0.5, nome: n.nome, papel: n.papel, voz: n.voz, look: ERS.lookNPC(i * 3 + ms.id.length, n.g, n.faixa), marcador: 'desafio', dir: i % 2 ? 1 : -1 });
       m.ocupar(t[0], t[1], 1, 1);
@@ -397,7 +915,7 @@
     });
     (ms.lotes || []).forEach((l) => {
       const p = pos.lotes[l.id]; if (!p) return;
-      const t = m.tile(p[0], p[1]);
+      const t = l.agua ? m.tile(p[0], p[1]) : tileLivre(p, l.fp);
       if (l.agua) {
         for (let j = 0; j < l.fp[1]; j++) for (let i = 0; i < l.fp[0]; i++) { if (!T.ehAgua(m.T(t[0] + i, t[1] + j))) m.set(t[0] + i, t[1] + j, T.AGUA_RASA, 0); }
       } else {
@@ -409,8 +927,8 @@
     });
     (ms.problemas || []).forEach((pb) => {
       const p = pos.problemas[pb.id]; if (!p) return;
-      const t = m.tile(p[0], p[1]);
       const fp = p[2] || (pb.fp || null);
+      const t = pb.spr === 'plataformaPetroleo' ? m.tile(p[0], p[1]) : tileLivre(p, fp || [1, 1]);
       if (fp) {
         if (!(pb.spr === 'plataformaPetroleo')) preparar(t[0], t[1], fp);
         m.ent({ kind: 'problema', ref: pb.id, spr: pb.spr, x: t[0], y: t[1], fp, h: pb.spr === 'plataformaPetroleo' ? 0 : undefined });
@@ -423,12 +941,12 @@
     });
     (ms.infos || []).forEach((inf, i) => {
       const p = pos.infos[i]; if (!p) return;
-      const t = m.tile(p[0], p[1]);
+      const t = tileLivre(p);
       preparar(t[0], t[1]);
       m.ent({ kind: 'info', ref: i, spr: 'placa', x: t[0] + 0.5, y: t[1] + 0.5 });
       m.ocupar(t[0], t[1], 1, 1);
     });
-    const ti = m.tile(pos.inicio[0], pos.inicio[1]);
+    const ti = tileLivre(pos.inicio);
     preparar(ti[0], ti[1]);
     m.inicio = ti;
     m.ocupar(ti[0], ti[1], 1, 1);
@@ -455,7 +973,7 @@
   // lugar livre para w×d tiles perto do início: terra firme, sem estrada, quase plano,
   // longe de outros pontos de interesse e alcançável a pé
   function acharLugar(m, w, d, op) {
-    const pontos = m.ents.filter((e) => e.kind === 'npc' || e.kind === 'lote' || e.kind === 'problema' || e.kind === 'info').map((e) => [e.x + (e.fp ? e.fp[0] / 2 : 0), e.y + (e.fp ? e.fp[1] / 2 : 0), e.kind === 'npc' ? 1 : 0]);
+    const pontos = m.ents.filter((e) => e.kind === 'npc' || e.kind === 'lote' || e.kind === 'problema' || e.kind === 'info' || e.kind === 'arranjo').map((e) => [e.x + (e.fp ? e.fp[0] / 2 : 0), e.y + (e.fp ? e.fp[1] / 2 : 0), e.kind === 'npc' ? 1 : 0]);
     pontos.push([m.inicio[0] + 0.5, m.inicio[1] + 0.5, 0]);
     // tiles alcançáveis a partir do início
     const N = m.N, alc = new Uint8Array(N * N), fila = [m.inicio];
@@ -510,11 +1028,8 @@
       return 0.775 - (ix - 0.86) * 1.5;
     };
     base(m, { costa, montanha: (ix) => 0.13 + Math.sin(ix * 9) * 0.03 + (ix < 0.25 ? 0.05 : 0), hMont: 42, hMax: 9 });
-    // vulcão (geotermia) — canto superior esquerdo
-    zona(m, 0.075, 0.06, 0.12, 0.16, (x, y, d) => {
-      const h = Math.round(3 + (1 - d) * 9);
-      m.set(x, y, d < 0.09 ? T.LAVA : d < 0.5 ? T.CINZA_VULC : T.ROCHA, d < 0.09 ? 11 : Math.max(m.H(x, y), h));
-    }, 0.15);
+    // vulcão (geotermia) — canto superior esquerdo: cone, cratera com lava, derrames e fumarolas
+    vulcao(m, 0.075, 0.06, 0.13, 0.17, { hMax: 12, derrames: [1.9, 2.9, 0.15], angLava: 1.25, fumarolas: [[0.32, 0.5], [0.3, 2.3], [0.4, 1.0]], solo: T.ROCHA });
     // lago de montanha e barragem
     zona(m, 0.34, 0.075, 0.075, 0.07, (x, y) => m.set(x, y, T.RIO, 3), 0.3);
     zona(m, 0.34, 0.075, 0.1, 0.1, (x, y) => { if (m.T(x, y) !== T.RIO) m.set(x, y, T.FLORESTA, Math.max(4, m.H(x, y))); }, 0.3);
@@ -530,16 +1045,14 @@
     zona(m, 0.78, 0.255, 0.07, 0.045, (x, y) => { if (!T.ehAgua(m.T(x, y))) m.set(x, y, T.AGROFLORESTA, 1); }, 0.3);
     // pastagens
     zona(m, 0.8, 0.355, 0.08, 0.05, (x, y) => { if (!T.ehAgua(m.T(x, y))) m.set(x, y, T.PASTO, 1); }, 0.3);
+    // campos úmidos (várzea) ao longo do rio principal
+    varzeas(m, { larg: 2, limiar: 0.5 });
     // lavouras
     zona(m, 0.69, 0.4, 0.05, 0.04, (x, y) => { if (!T.ehAgua(m.T(x, y))) m.set(x, y, T.LAVOURA, 1); }, 0.2);
     // canaviais (monocultura)
     m.cada((x, y, ix, iy) => { if (ix > 0.87 && iy > 0.24 && iy < 0.47 && !T.ehAgua(m.T(x, y))) m.set(x, y, T.CANA, 1); });
-    // mineração (cava em degraus)
-    zona(m, 0.1, 0.33, 0.1, 0.12, (x, y, d) => {
-      const h = d < 0.25 ? -2 : d < 0.5 ? -1 : d < 0.75 ? 0 : 1;
-      m.set(x, y, T.MINA, h);
-    }, 0.2);
-    tipoEm(m, 0.07, 0.33, 0.02, 0.025, T.REJEITO, -2, 0.1);
+    // mineração: cava em bancadas, com rampa espiral e lago no fundo
+    cava(m, 0.1, 0.33, 0.1, 0.12, { niveis: 3, h0: 1, angRampa: -0.6, irr: 0.06 });
     tipoEm(m, 0.13, 0.435, 0.035, 0.022, T.REJEITO, 0, 0.3);
     // colinas eólicas
     zona(m, 0.09, 0.64, 0.1, 0.12, (x, y, d) => { if (!T.ehAgua(m.T(x, y))) m.set(x, y, T.GRAMA, 1 + Math.round((1 - d) * 3)); }, 0.3);
@@ -594,8 +1107,8 @@
     // maremotriz
     [[0.76, 0.86], [0.8, 0.87], [0.84, 0.86]].forEach((p) => { const t = m.tile(p[0], p[1]); deco(m, 'turbinaMare', t[0], t[1], 0, { fp: [1, 1], h: 0 }); m.ocupar(t[0], t[1], 1, 1); });
     const tp = m.tile(0.64, 0.9); deco(m, 'plataformaPetroleo', tp[0], tp[1], 0, { fp: [2, 2], h: 0, id: 'hubPlataforma' }); m.ocupar(tp[0], tp[1], 2, 2);
-    // mineração: caminhões e escavadeiras
-    [[0.08, 0.3], [0.12, 0.36], [0.06, 0.38]].forEach((p, i) => { const t = m.tile(p[0], p[1]); deco(m, i % 2 ? 'caminhaoMina' : 'escavadeira', t[0] + 0.5, t[1] + 0.5, 0); });
+    // mineração: caminhões, escavadeiras e perfuratrizes trabalhando na cava
+    maquinasCava(m);
     // praia
     [[0.64, 0.74], [0.67, 0.75], [0.7, 0.745], [0.73, 0.75], [0.77, 0.745]].forEach((p, i) => { const t = m.tile(p[0], p[1]); deco(m, 'guardaSol', t[0] + 0.5, t[1] + 0.5, i); });
     edI(m, 'quiosque', 0.69, 0.72, [1, 1]);
@@ -606,11 +1119,18 @@
     linhaTransmissao(m, [[0.2, 0.62], [0.27, 0.5], [0.33, 0.47]]);
     linhaTransmissao(m, [[0.14, 0.58], [0.21, 0.55], [0.27, 0.5]]);
 
-    // marcadores de missão (pins)
+    // marcadores de missão (pins), narradora e placas: fora das estradas e pontes
+    const foraDaVia = (p) => {
+      const t = m.tile(p[0], p[1]);
+      const ok = (x, y) => m.dentro(x, y) && !m.bloq[m.i(x, y)] && m.T(x, y) !== T.ESTRADA && m.T(x, y) !== T.PONTE && !T.ehAgua(m.T(x, y)) && m.T(x, y) !== T.LAVA;
+      if (ok(t[0], t[1])) return t;
+      for (let r = 1; r <= 5; r++) for (let dy = -r; dy <= r; dy++) for (let dx = -r; dx <= r; dx++) if (Math.max(Math.abs(dx), Math.abs(dy)) === r && ok(t[0] + dx, t[1] + dy)) return [t[0] + dx, t[1] + dy];
+      return t;
+    };
     const pinTiles = [];
     const PINS = { solar: [0.31, 0.49], eolica: [0.14, 0.555], hidro: [0.4, 0.285], mare: [0.74, 0.715], geo: [0.24, 0.2], cana: [0.87, 0.37], residuos: [0.46, 0.66], floresta: [0.72, 0.18], mineracao: [0.21, 0.38], dados: [0.72, 0.555], rede: [0.5, 0.42] };
     ERS.MISSOES.forEach((ms) => {
-      const p = PINS[ms.id]; const t = m.tile(p[0], p[1]);
+      const p = PINS[ms.id]; const t = foraDaVia(p);
       if (m.bloq[m.i(t[0], t[1])]) m.bloq[m.i(t[0], t[1])] = 0;
       if (!T.props[m.T(t[0], t[1])].andavel || m.T(t[0], t[1]) === T.LAVA || m.T(t[0], t[1]) === T.PONTE) m.set(t[0], t[1], T.GRAMA, Math.max(1, m.H(t[0], t[1])));
       if (m.T(t[0], t[1]) === T.CANA) m.set(t[0], t[1], T.TERRA); // clareira no canavial para o marcador
@@ -620,14 +1140,29 @@
     });
     // narrador e placas
     const hub = ERS.HUB;
-    const tn2 = m.tile(0.475, 0.525);
+    const tn2 = foraDaVia([0.475, 0.525]);
     m.ent({ kind: 'npc', papelJogo: 'narrador', x: tn2[0] + 0.5, y: tn2[1] + 0.5, nome: hub.narrador.nome, papel: hub.narrador.papel, voz: hub.narrador.voz, look: ERS.LOOKS.iara, marcador: 'narrador' });
     m.ocupar(tn2[0], tn2[1], 1, 1);
-    [[0.53, 0.52], [0.36, 0.42], [0.62, 0.68]].forEach((p, i) => { const t = m.tile(p[0], p[1]); if (m.bloq[m.i(t[0], t[1])]) return; m.ent({ kind: 'info', ref: i, spr: 'placa', x: t[0] + 0.5, y: t[1] + 0.5 }); m.ocupar(t[0], t[1], 1, 1); });
+    [[0.53, 0.52], [0.36, 0.42], [0.62, 0.68]].forEach((p, i) => { const t = foraDaVia(p); if (m.bloq[m.i(t[0], t[1])]) return; m.ent({ kind: 'info', ref: i, spr: 'placa', x: t[0] + 0.5, y: t[1] + 0.5 }); m.ocupar(t[0], t[1], 1, 1); });
     m.inicio = m.tile(0.495, 0.535);
-    const cr = m.tile(0.075, 0.06), cr2 = m.tile(0.085, 0.07);
-    m.vapor = [[cr[0], cr[1], 'escura', 3], [cr2[0], cr2[1], 'vapor', 1.5]];
     m.bloq[m.i(m.inicio[0], m.inicio[1])] = 1;
+    // implementos do campo e da cidade
+    implemento(m, 'pivoCentral', 0.69, 0.4, [3, 3], 0, { tipos: [T.LAVOURA], raio: 4 });
+    maquina(m, 'trator', 0.67, 0.43, 0, { tipos: [T.LAVOURA, T.GRAMA], raio: 4 });
+    implemento(m, 'silos', 0.725, 0.35, [1, 1], 0, { raio: 3 });
+    implemento(m, 'galpaoRural', 0.86, 0.315, [1, 1], 1, { raio: 3 });
+    implemento(m, 'curral', 0.77, 0.33, [1, 1], 0, { raio: 3 });
+    implemento(m, 'caixaDagua', 0.71, 0.62, [1, 1], 0, { raio: 4 });
+    implemento(m, 'posto', 0.6, 0.465, [1, 1], 0, { raio: 4 });
+    implemento(m, 'torreCelular', 0.6, 0.37, [1, 1], 0, { raio: 4 });
+    implemento(m, 'eta', 0.53, 0.29, [1, 1], 0, { raio: 4 });
+    implemento(m, 'subestacao', 0.25, 0.5, [1, 1], 0, { raio: 3 });
+    maquina(m, 'tratorEsteira', 0.2, 0.36, 0, { raio: 3 });
+    maquina(m, 'urubus', 0.29, 0.43, 0, { raio: 3 }); maquina(m, 'urubus', 0.23, 0.39, 1, { raio: 3 });
+    maquina(m, 'carretaPa', 0.18, 0.5, 0, { tipos: [T.GRAMA], raio: 4 });
+    // arranjo de energia limpa da cidade
+    arranjos(m, 'hub', [[0.6, 0.56]]);
+    pastagens(m);
     cidade(m, 0.5, 0.46, 21, 21, { passo: 5, densidade: 0.8, agora: true, soPredios: true });
     arborizar(m, { densFloresta: 2, densGrama: 0.07, densPalma: 0.12 });
     m.bloq[m.i(m.inicio[0], m.inicio[1])] = 0;
@@ -659,6 +1194,12 @@
       infos: [[0.52, 0.55], [0.31, 0.36]],
     });
     deco(m, 'veleiro', m.tile(0.2, 0.2)[0] + 2.5, m.tile(0.2, 0.2)[1] + 0.5, 1, { agua: true });
+    arranjos(m, 'solar', [[0.66, 0.4]]);
+    implemento(m, 'caixaDagua', 0.64, 0.7, [1, 1], 0, { raio: 4 });
+    implemento(m, 'posto', 0.72, 0.52, [1, 1], 0, { raio: 4 });
+    implemento(m, 'torreCelular', 0.78, 0.62, [1, 1], 0, { raio: 4 });
+    implemento(m, 'subestacao', 0.82, 0.45, [1, 1], 0, { raio: 4 });
+    maquina(m, 'trator', 0.84, 0.6, 2, { raio: 3 });
     arborizar(m, { densFloresta: 2, densGrama: 0.1, densPalma: 0.15 });
     limpar(m);
     garantirAcesso(m);
@@ -675,7 +1216,7 @@
       const d = Math.abs(iy - crista);
       if (d < 0.17 && !T.ehAgua(m.T(x, y))) {
         const h = Math.round(1 + (1 - d / 0.17) * 4.5 + (m.ruido(x * 0.2, y * 0.2) - 0.5));
-        m.set(x, y, h >= 4 ? T.GRAMA : T.GRAMA, Math.max(1, h));
+        m.set(x, y, h >= 3 && m.ruido(x * 0.17 + 9, y * 0.17) > 0.42 ? T.CERRADO : T.GRAMA, Math.max(1, h));
       }
     });
     tipoEm(m, 0.24, 0.6, 0.08, 0.07, T.RIO, 0, 0.4);
@@ -696,6 +1237,12 @@
     });
     linhaTransmissao(m, [[0.24, 0.3], [0.33, 0.36], [0.42, 0.42]]);
     linhaTransmissao(m, [[0.6, 0.3], [0.52, 0.37], [0.44, 0.44]]);
+    arranjos(m, 'eolica', [[0.88, 0.63]]);
+    maquina(m, 'carretaPa', 0.3, 0.44, 0, { tipos: [T.GRAMA, T.CERRADO], raio: 4 });
+    implemento(m, 'galpaoRural', 0.14, 0.42, [1, 1], 0, { raio: 4 });
+    implemento(m, 'caixaDagua', 0.84, 0.48, [1, 1], 0, { raio: 4 });
+    implemento(m, 'posto', 0.6, 0.52, [1, 1], 0, { raio: 4 });
+    implemento(m, 'torreCelular', 0.5, 0.18, [1, 1], 0, { raio: 4 });
     arborizar(m, { densGrama: 0.05, densPalma: 0.12, tropical: false });
     for (let i = 0; i < 6; i++) { const t = m.tile(0.2 + i * 0.015, 0.6 + (i % 2) * 0.02); deco(m, 'barco', t[0] + 0.5, t[1] + 0.5, i, { agua: true }); i++; }
     limpar(m);
@@ -714,6 +1261,9 @@
     rio(m, [[0.33, 0.29], [0.38, 0.38], [0.46, 0.48], [0.56, 0.56], [0.68, 0.66], [0.8, 0.78], [0.92, 0.92], [1.02, 1.05]], 2.6);
     // barragem
     represa(m, 0.325, 0.27, 3, 3);
+    // várzeas e uma lavoura irrigada rio abaixo
+    varzeas(m, { larg: 2, limiar: 0.48 });
+    zona(m, 0.86, 0.6, 0.07, 0.06, (x, y) => { if (!T.ehAgua(m.T(x, y)) && m.T(x, y) !== T.ESTRADA) m.set(x, y, T.LAVOURA, 1); }, 0.15);
     m.cada((x, y, ix, iy) => { if (iy < 0.3 && iy > 0.24 && !T.ehAgua(m.T(x, y)) && m.T(x, y) !== T.PATIO && Math.abs(ix - 0.32) < 0.15) m.setH(x, y, Math.max(m.H(x, y), 2)); });
     // margens desmatadas
     m.cada((x, y, ix, iy) => {
@@ -722,7 +1272,7 @@
       if (ix > 0.38 && ix < 0.62 && dRio < 0.07) m.set(x, y, T.TERRA, 1);
     });
     cidade(m, 0.72, 0.42, 10, 9, { passo: 4, tipos: ['casa', 'casa', 'casaSolar', 'casa'], densidade: 0.75, centro: false });
-    estrada(m, [[0.38, 0.27], [0.5, 0.36], [0.64, 0.42], [0.8, 0.44], [0.98, 0.5]]);
+    estrada(m, [[0.41, 0.29], [0.5, 0.36], [0.64, 0.42], [0.8, 0.44], [0.98, 0.5]]);
     estrada(m, [[0.5, 0.36], [0.4, 0.6], [0.2, 0.7]]);
     suavizarEstradas(m);
     conteudo(m, ms('hidro'), {
@@ -733,6 +1283,13 @@
       infos: [[0.6, 0.5], [0.26, 0.5]],
     });
     m.margens = { ix0: 0.38, ix1: 0.62 };
+    arranjos(m, 'hidro', [[0.78, 0.7]]);
+    implemento(m, 'pivoCentral', 0.86, 0.6, [3, 3], 1, { tipos: [T.LAVOURA], raio: 4 });
+    maquina(m, 'trator', 0.82, 0.55, 3, { raio: 4 });
+    implemento(m, 'silos', 0.8, 0.38, [1, 1], 0, { raio: 4 });
+    implemento(m, 'galpaoRural', 0.86, 0.42, [1, 1], 1, { raio: 4 });
+    implemento(m, 'casaForca', 0.4, 0.33, [1, 1], 0, { raio: 3 });
+    canoas(m, [[0.6, 0.6], [0.74, 0.72], [0.86, 0.86]]);
     arborizar(m, { densFloresta: 2, densGrama: 0.08 });
     limpar(m);
     garantirAcesso(m);
@@ -767,6 +1324,12 @@
     edI(m, 'guindaste', 0.24, 0.45, [1, 1]);
     edI(m, 'farol', 0.04, 0.42, [1, 1]);
     const tn = m.tile(0.24, 0.53); deco(m, 'navio', tn[0] + 1.5, tn[1] + 0.5, 1, { agua: true, profExtra: 1 }); m.ocupar(tn[0] - 1, tn[1], 5, 1);
+    arranjos(m, 'mare', [[0.64, 0.32]]);
+    implemento(m, 'galpao', 0.28, 0.36, [2, 1], 0, { raio: 3 });
+    implemento(m, 'torreCelular', 0.5, 0.12, [1, 1], 0, { raio: 4 });
+    implemento(m, 'caixaDagua', 0.3, 0.16, [1, 1], 0, { raio: 4 });
+    implemento(m, 'posto', 0.66, 0.26, [1, 1], 0, { raio: 4 });
+    canoas(m, [[0.81, 0.08], [0.8, 0.18]]);
     arborizar(m, { densGrama: 0.08, densPalma: 0.2 });
     limpar(m);
     garantirAcesso(m);
@@ -777,11 +1340,8 @@
   MAPAS.geo = function () {
     const m = ERS.novoMapa(72, 505);
     base(m, { costa: (ix) => 0.86 - ix * 0.08, montanha: () => 0.05, hMont: 20 });
-    // grande vulcão
-    zona(m, 0.5, 0.06, 0.24, 0.26, (x, y, d) => {
-      const h = Math.round(1 + (1 - d) * 11);
-      m.set(x, y, d < 0.07 ? T.LAVA : d < 0.45 ? T.CINZA_VULC : d < 0.7 ? T.ROCHA : T.GRAMA, d < 0.07 ? 11 : Math.max(m.H(x, y), h));
-    }, 0.12);
+    // grande vulcão: cone, borda da cratera, lago de lava, derrames de basalto e fumarolas
+    vulcao(m, 0.5, 0.06, 0.24, 0.26, { hMax: 12, derrames: [1.0, 2.3, 2.9], angLava: 1.75, fumarolas: [[0.34, 1.2], [0.4, 2.1], [0.3, 0.5]] });
     m.cada((x, y, ix, iy) => { if (m.T(x, y) === T.GRAMA && m.ruido.fbm(x * 0.12, y * 0.12, 3) > 0.55) m.set(x, y, T.FLORESTA); });
     tipoEm(m, 0.22, 0.48, 0.1, 0.08, T.CINZA_VULC, 1, 0.3);
     tipoEm(m, 0.36, 0.62, 0.03, 0.025, T.AGUA_RASA, 1, 0.2);
@@ -796,10 +1356,14 @@
       problemas: { oleo: [0.8, 0.66, [2, 2]] },
       infos: [[0.43, 0.42], [0.58, 0.56]],
     });
-    // fumarolas
-    m.vapor = [];
-    [[0.18, 0.4], [0.26, 0.52], [0.15, 0.5], [0.35, 0.61], [0.55, 0.16]].forEach((p) => m.vapor.push(m.tile(p[0], p[1])));
-    const cv = m.tile(0.5, 0.06); m.vapor.push([cv[0], cv[1], 'escura', 3.5]);
+    // fumarolas do campo geotérmico (a cratera já solta fumaça)
+    m.vapor = m.vapor || [];
+    [[0.18, 0.4], [0.26, 0.52], [0.15, 0.5], [0.35, 0.61]].forEach((p) => m.vapor.push(m.tile(p[0], p[1])));
+    arranjos(m, 'geo', [[0.78, 0.55]]);
+    implemento(m, 'caixaDagua', 0.68, 0.74, [1, 1], 0, { raio: 4 });
+    implemento(m, 'torreCelular', 0.3, 0.32, [1, 1], 0, { raio: 4 });
+    implemento(m, 'galpaoRural', 0.85, 0.48, [1, 1], 1, { raio: 4 });
+    maquina(m, 'trator', 0.82, 0.44, 1, { raio: 4 });
     arborizar(m, { densFloresta: 2, densGrama: 0.06, densPalma: 0.1 });
     limpar(m);
     garantirAcesso(m);
@@ -848,6 +1412,14 @@
     m.semCorVeiculo = '#2f7ad2';
     m.semZigueZague = true;
     m.animaisExtras = [];
+    arranjos(m, 'cana', [[0.34, 0.69]]);
+    implemento(m, 'silos', 0.68, 0.4, [1, 1], 0, { raio: 3 });
+    implemento(m, 'galpaoRural', 0.12, 0.62, [1, 1], 1, { raio: 4 });
+    implemento(m, 'curral', 0.17, 0.73, [1, 1], 0, { raio: 4 });
+    maquina(m, 'caminhaoPipa', 0.74, 0.27, 0, { raio: 4 });
+    maquina(m, 'trator', 0.62, 0.66, 0, { raio: 4 });
+    implemento(m, 'caixaDagua', 0.62, 0.8, [1, 1], 0, { raio: 4 });
+    pastagens(m);
     arborizar(m, { densGrama: 0.08 });
     limpar(m);
     garantirAcesso(m);
@@ -879,6 +1451,13 @@
     edI(m, 'fazenda', 0.9, 0.16, [1, 1]); edI(m, 'fazenda', 0.82, 0.24, [1, 1], 1);
     m.animaisExtras = [];
     for (let i = 0; i < 6; i++) { const t = m.tile(0.84 + (i % 3) * 0.02, 0.2 + Math.floor(i / 3) * 0.03); m.animaisExtras.push({ x: t[0] + 0.5, y: t[1] + 0.5, spr: 'vaca', v: 1, terreno: T.PASTO }); }
+    arranjos(m, 'residuos', [[0.36, 0.11]]);
+    maquina(m, 'urubus', 0.2, 0.3, 0, { raio: 3 }); maquina(m, 'urubus', 0.1, 0.32, 1, { raio: 3 });
+    implemento(m, 'eta', 0.27, 0.58, [1, 1], 0, { raio: 4 });
+    implemento(m, 'torreCelular', 0.7, 0.3, [1, 1], 0, { raio: 4 });
+    implemento(m, 'curral', 0.8, 0.16, [1, 1], 0, { raio: 4 });
+    implemento(m, 'silos', 0.92, 0.22, [1, 1], 0, { raio: 4 });
+    pastagens(m);
     arborizar(m, { densGrama: 0.09 });
     limpar(m);
     garantirAcesso(m);
@@ -907,6 +1486,12 @@
     edI(m, 'fazenda', 0.22, 0.7, [1, 1]);
     m.animaisExtras = [];
     for (let i = 0; i < 5; i++) { const t = m.tile(0.26 + i * 0.02, 0.7); m.animaisExtras.push({ x: t[0] + 0.5, y: t[1] + 0.5, spr: 'vaca', v: i, terreno: T.GRAMA_SECA }); }
+    arranjos(m, 'floresta', [[0.3, 0.52]]);
+    implemento(m, 'curral', 0.24, 0.76, [1, 1], 0, { raio: 4 });
+    implemento(m, 'galpaoRural', 0.19, 0.66, [1, 1], 1, { raio: 4 });
+    implemento(m, 'caixaDagua', 0.7, 0.64, [1, 1], 0, { raio: 4 });
+    canoas(m, [[0.12, 0.4], [0.5, 0.5], [0.74, 0.51], [0.9, 0.52]]);
+    pastagens(m, T.GRAMA_SECA);
     arborizar(m, { densFloresta: 2, densGrama: 0.12 });
     limpar(m);
     garantirAcesso(m);
@@ -918,8 +1503,8 @@
     const m = ERS.novoMapa(72, 909);
     base(m, { montanha: (ix) => 0.22 + Math.sin(ix * 8) * 0.04, hMont: 30, hMax: 8 });
     m.cada((x, y, ix, iy) => { if (m.T(x, y) === T.GRAMA && m.ruido.fbm(x * 0.1, y * 0.1, 3) > 0.56) m.set(x, y, T.FLORESTA); });
-    zona(m, 0.28, 0.3, 0.12, 0.13, (x, y, d) => m.set(x, y, T.MINA, d < 0.3 ? -2 : d < 0.6 ? -1 : 0), 0.15);
-    tipoEm(m, 0.28, 0.3, 0.02, 0.02, T.REJEITO, -2, 0.1);
+    // cava em bancadas com rampa, lago no fundo e pilha de estéril ao lado
+    cava(m, 0.28, 0.3, 0.12, 0.13, { niveis: 4, h0: 1, angRampa: 0.9, irr: 0.08, esteril: [0.11, 0.36, 0.05, 0.06] });
     zona(m, 0.48, 0.25, 0.06, 0.06, (x, y) => m.set(x, y, T.TERRA, 1), 0.3);
     rio(m, [[0.66, 0.26], [0.6, 0.42], [0.52, 0.6], [0.45, 0.8], [0.4, 1.02]], 2, T.REJEITO);
     const celRejeito = m._celRio.slice();
@@ -944,7 +1529,13 @@
       infos: [[0.6, 0.6], [0.3, 0.5]],
     });
     edI(m, 'beneficiamento', 0.32, 0.46, [2, 2]);
-    [[0.24, 0.26], [0.3, 0.34], [0.22, 0.34], [0.34, 0.24]].forEach((p, i) => { const t = m.tile(p[0], p[1]); deco(m, i % 2 ? 'caminhaoMina' : 'escavadeira', t[0] + 0.5, t[1] + 0.5, 0); });
+    maquinasCava(m);
+    correiaEntre(m, [0.36, 0.36], [0.35, 0.44]);
+    maquina(m, 'tratorEsteira', 0.11, 0.36, 0, { tipos: [T.ESTERIL], raio: 3 });
+    arranjos(m, 'mineracao', [[0.5, 0.67]]);
+    implemento(m, 'caixaDagua', 0.76, 0.54, [1, 1], 0, { raio: 4 });
+    implemento(m, 'torreCelular', 0.6, 0.7, [1, 1], 0, { raio: 4 });
+    implemento(m, 'galpaoRural', 0.44, 0.48, [1, 1], 0, { raio: 3 });
     arborizar(m, { densFloresta: 2, densGrama: 0.06, tropical: false });
     limpar(m);
     garantirAcesso(m);
@@ -978,6 +1569,10 @@
     edI(m, 'subestacao', 0.64, 0.3, [1, 1]);
     edI(m, 'carregadorVE', 0.47, 0.38, [1, 1]);
     linhaTransmissao(m, [[0.68, 0.3], [0.76, 0.32], [0.84, 0.3]]);
+    arranjos(m, 'dados', [[0.34, 0.24]]);
+    implemento(m, 'torreCelular', 0.68, 0.22, [1, 1], 0, { raio: 4 });
+    implemento(m, 'caixaDagua', 0.18, 0.68, [1, 1], 0, { raio: 4 });
+    implemento(m, 'posto', 0.68, 0.48, [1, 1], 0, { raio: 4 });
     arborizar(m, { densGrama: 0.08 });
     limpar(m);
     garantirAcesso(m);
@@ -1012,6 +1607,12 @@
     linhaTransmissao(m, [[0.6, 0.22], [0.58, 0.28]]);
     linhaTransmissao(m, [[0.72, 0.68], [0.68, 0.56], [0.64, 0.44], [0.6, 0.38]]);
     linhaTransmissao(m, [[0.28, 0.62], [0.34, 0.48]]);
+    arranjos(m, 'rede', [[0.3, 0.74]]);
+    implemento(m, 'posto', 0.66, 0.5, [1, 1], 0, { raio: 4 });
+    implemento(m, 'torreCelular', 0.24, 0.52, [1, 1], 0, { raio: 4 });
+    implemento(m, 'caixaDagua', 0.62, 0.72, [1, 1], 0, { raio: 4 });
+    varzeas(m, { larg: 1, limiar: 0.5 });
+    canoas(m, [[0.62, 0.48], [0.7, 0.7]]);
     arborizar(m, { densFloresta: 2, densGrama: 0.07, densPalma: 0.12 });
     limpar(m);
     garantirAcesso(m);
@@ -1033,20 +1634,21 @@
       });
     }
     let mudou = false;
-    for (let k = 0; k < 4; k++) for (let y = 0; y < m.N; y++) for (let x = 0; x < m.N; x++) {
-      if (!eh(x, y) || m.T(x, y) === T.PONTE) continue;
-      D4.forEach((d) => {
-        const nx = x + d[0], ny = y + d[1];
-        if (!eh(nx, ny) || m.T(nx, ny) === T.PONTE) return;
-        const a = m.H(x, y), b = m.H(nx, ny);
-        if (a > b) { m.setH(x, y, b); mudou = true; }
-      });
-    }
     // as pontes ficam na mesma altura das estradas que chegam até elas
     for (let y = 0; y < m.N; y++) for (let x = 0; x < m.N; x++) {
       if (m.T(x, y) !== T.ESTRADA) continue;
       D4.forEach((d) => { if (m.T(x + d[0], y + d[1]) === T.PONTE && m.H(x, y) > 1) { m.setH(x, y, 1); mudou = true; } });
     }
+    // nivela até não sobrar degrau entre tiles de estrada vizinhos
+    for (let k = 0, mexeu = true; k < 40 && mexeu; k++) { mexeu = false; for (let y = 0; y < m.N; y++) for (let x = 0; x < m.N; x++) {
+      if (!eh(x, y) || m.T(x, y) === T.PONTE) continue;
+      D4.forEach((d) => {
+        const nx = x + d[0], ny = y + d[1];
+        if (!eh(nx, ny) || m.T(nx, ny) === T.PONTE) return;
+        const a = m.H(x, y), b = m.H(nx, ny);
+        if (a > b) { m.setH(x, y, b); mudou = true; mexeu = true; }
+      });
+    } }
     return mudou;
   }
 
@@ -1081,6 +1683,14 @@
     const m = f();
     m.id = id;
     acabarEstradas(m);
+    // rede viária contínua: trechos soltos ligados à cidade e nenhuma ponta sem destino
+    conectarRede(m);
+    resolverPontas(m);
+    conectarRede(m);
+    resolverPontas(m);
+    acabarEstradas(m);
+    nivelarCorredor(m);
+    limpar(m);
     if (EXTRAS[id]) povoar(m, EXTRAS[id]);
     garantirAcesso(m);
     return m;

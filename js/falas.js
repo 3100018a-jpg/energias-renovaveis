@@ -54,6 +54,7 @@
     ERS.HUB.intro.forEach((t) => add(t, 'iara'));
     add(ERS.HUB.retorno, 'iara');
     ERS.HUB.infos.forEach((i) => add(ERS.falaInfo(i), 'iara'));
+    (ERS.ARRANJOS && ERS.ARRANJOS.hub || []).forEach((a) => add(ERS.falaInfo(ERS.infoArranjo(a)), 'iara'));
     [F.hubOla, F.hubFinal, F.hubBloqueada, F.hubTodas].forEach((t) => add(t, 'iara'));
     ERS.MISSOES.forEach((ms) => {
       const vn = ms.narrador.voz;
@@ -61,6 +62,7 @@
       ms.intro.forEach((t) => add(t, vn));
       ms.conclusao.forEach((t) => add(t, vn));
       ms.infos.forEach((i) => add(ERS.falaInfo(i), vn));
+      (ERS.ARRANJOS && ERS.ARRANJOS[ms.id] || []).forEach((a) => add(ERS.falaInfo(ERS.infoArranjo(a)), vn));
       ms.problemas.forEach((pb) => { add(ERS.falaProblema(pb), vn); add(pb.fala, vn); (pb.alternativas || []).forEach((a) => add(a.fala, vn)); });
       ms.lotes.forEach((l) => l.opcoes.forEach((o) => add(ERS.falaItem(ERS.opcaoLote(o)), vn)));
       [F.extra, F.semCredito, F.requisito, F.requisito24, F.quaseLa, F.sujo, F.demolir].concat(F.dicas).forEach((t) => add(t, vn));

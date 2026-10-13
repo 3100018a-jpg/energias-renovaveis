@@ -29,6 +29,18 @@ Funciona direto no navegador, sem instalação, e foi preparado para ser publica
 - **Seis moradores por missão**, cada um com desafio, aparência e voz próprios, além de casas, sítios e comércios espalhados pelos mapas.
 - **Estradas contínuas e suaves**, com acostamento, faixas e cruzamentos; os veículos seguem as curvas na mão direita.
 - **Problemas ambientais** a resolver: termelétricas a carvão e a óleo, gerador a diesel, vazamento de petróleo, lixão, queimadas, barragem de rejeitos, usina nuclear. Cada problema tem três soluções, com custos, requisitos e efeitos diferentes; algumas são parciais e pedem atenção. Algumas só podem ser aplicadas quando já existe energia limpa suficiente.
+- **Arranjos de energia limpa já instalados nos mapas**: em cada missão (e no mapa central) há uma construção visitável, com marcador verde, que mostra como combinar fontes limpas para enfrentar um problema do lugar: garagem de ônibus elétricos com telhado solar, estacionamento solar com baterias, dessalinizadora movida a vento e sol, irrigação com bombeamento solar, fábrica de gelo solar para a pesca, central de calor geotérmico em cascata, biometano da vinhaça, aterro sanitário que gera energia, comunidade ribeirinha com microrrede solar, mina com correia transportadora e caminhões elétricos, resfriamento de data center com água de reúso e sol flutuante, e usina virtual de baterias. Cada um é narrado e vale pontos e créditos na primeira visita.
+- **Paisagens mais próximas da realidade**:
+  - **Vulcões** em cone, com borda de cratera, lago de lava, derrame ativo, derrames antigos de basalto (com colunas de resfriamento nas encostas), fumarolas com crosta de enxofre e vegetação voltando nas encostas baixas.
+  - **Cavas de mineração** em bancadas com camadas de laterita, furos de perfuração, rampa de serviço em espiral, lago no fundo da cava, pilha de estéril, escavadeiras, caminhões fora de estrada, perfuratrizes, caminhão-pipa, trator de esteira e correia transportadora.
+  - **Represas** com barragem de concreto em perfil de gravidade, crista com pista e iluminação, vertedouro com comportas e água descendo em degraus, bacia de dissipação com espuma, tomada d'água com condutos forçados e casa de força.
+  - **Rios** com canal mais fundo no meio, correnteza, água rasa nas margens, barrancos com linha d'água, seixos e raízes, juncos e taboas, mata ciliar com buritis e campos de várzea.
+  - **Pastagens** cercadas, com trilhas de gado, solo exposto pelo pastejo, cupinzeiros, cocho, bebedouro, curral e galpão.
+  - **Lixão e aterro sanitário** detalhados: montes de lixo, chorume, urubus e catadores no lixão; células cobertas com grama, manta impermeável, drenos de biogás com queimadores, lagoa de chorume revestida e compactador no aterro.
+  - **Solos e vegetação**: cerrado com árvores tortuosas e capim dourado, várzea com poças, rocha com placas, líquens e matacões, floresta com serrapilheira, ipês floridos, capim alto e flores do campo.
+  - **Implementos** espalhados pelos mapas: pivô central de irrigação, tratores, silos, galpões rurais, caixas-d'água, postos com cobertura solar e eletroposto, torres de celular, estações de tratamento de água, subestações, canoas e carreta levando pá de aerogerador.
+- **Estradas sempre conectadas**: todos os trechos de estrada de cada mapa formam uma rede única ligada à cidade. Pontas sem saída seguem até a borda do mapa, fecham um anel com outra estrada ou terminam num destino (sítio, galpão, posto, mirante); trechos vazios são removidos. As pontes são retas, com cabeceiras alinhadas, encontros de concreto e o terreno nivelado ao lado da pista.
+- **Veículos com frente e traseira**: carros, ônibus e caminhões têm capô, cabine, para-brisa, faróis, lanternas e rodas, seguem o sentido da pista na mão direita, fazem curvas suaves nos cruzamentos, retornam no fim da via e reduzem a velocidade quando há outro veículo à frente.
 - **Missão final com painel das 24 horas**: mostra, hora a hora, se sol, vento, marés, biogás, hidrelétricas e armazenamento atendem o consumo da cidade.
 - **Insígnias, estrelas, pontos, conquistas especiais e certificado final** com o nome do estudante.
 - **Dia, entardecer, noite e ciclo automático**, escolhidos no mapa central, no cartão de cada missão ou no botão do topo da tela. À noite, janelas, postes, faróis dos carros, o farol da costa, o fogo e a lava se acendem.
@@ -54,6 +66,28 @@ Para gerar as vozes no seu próprio computador:
 pip install edge-tts
 node tools/exportar_falas.js
 python tools/gerar_vozes.py
+```
+
+## Como atualizar o jogo já publicado
+
+Se o jogo já está no ar no seu GitHub, basta enviar os arquivos alterados:
+
+1. Abra o repositório no GitHub (por exemplo, `github.com/seu-usuario/energias-renovaveis`).
+2. Clique em **Add file → Upload files**.
+3. Arraste para a página a pasta `js` e os arquivos `index.html`, `amostras.html` e `README.md` desta versão. Arquivos com o mesmo nome são substituídos; o arquivo novo `js/cenario.js` é acrescentado.
+4. Em **Commit changes**, escreva uma descrição (por exemplo, "Mapas mais detalhados e arranjos de energia limpa"), deixe marcado **Commit directly to the main branch** e confirme.
+5. Abra a aba **Actions** e acompanhe o fluxo "Publicar jogo". Ele grava as vozes das falas novas e publica o site em poucos minutos.
+6. Abra o endereço do jogo e recarregue a página sem cache (Ctrl + F5 no computador) para ver a nova versão.
+
+Pela linha de comando, o mesmo resultado:
+
+```bash
+git clone https://github.com/seu-usuario/energias-renovaveis.git
+cd energias-renovaveis
+# copie para cá os arquivos novos, substituindo os antigos
+git add .
+git commit -m "Mapas mais detalhados e arranjos de energia limpa"
+git push
 ```
 
 ## Como publicar no GitHub Pages
@@ -94,6 +128,7 @@ js/qualidade.js          qualidade gráfica automática
 js/audio.js              vozes pt-BR, efeitos e trilha sonora
 js/sprites.js            construções, árvores e personagens pintados em código
 js/obras.js              desenhos exclusivos das opções de construção dos lotes
+js/cenario.js            vegetação nativa, implementos, barragem, lixão, aterro e arranjos de energia limpa
 js/terreno.js            tipos de terreno e ferramentas de mapa
 js/dados.js              missões, personagens, questões e construções
 js/falas.js              frases faladas e lista para gerar as vozes

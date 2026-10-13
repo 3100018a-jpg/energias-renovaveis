@@ -935,4 +935,46 @@
     { id: 'zerofossil', nome: 'Zero Fóssil', desc: 'Aposentou as fontes fósseis e nuclear da cidade.', icone: 'folha', cor: '#1fa3a3' },
     { id: 'mestre', nome: 'Mestre da Sustentabilidade', desc: 'Conquistou todas as insígnias de missão.', icone: 'certificado', cor: '#d23b6a' },
   ];
+  // ---------- arranjos de energia limpa já instalados nos mapas ----------
+  // Cada arranjo é uma construção visitável que mostra como combinar fontes limpas
+  // para enfrentar um problema concreto do lugar.
+  ERS.ARRANJOS = {
+    hub: [
+      { spr: 'garagemOnibusSolar', nome: 'Garagem de ônibus elétricos com telhado solar', texto: 'Problema: os ônibus a diesel poluíam o ar do centro e faziam muito barulho. Solução: na garagem, a cobertura de painéis solares carrega os ônibus elétricos durante o dia, e um banco de baterias completa a recarga à noite. O ar fica mais limpo e o transporte, silencioso.' },
+    ],
+    solar: [
+      { spr: 'carportSolar', nome: 'Estacionamento solar com eletroposto e baterias', texto: 'Problema: muitos carros elétricos recarregando ao mesmo tempo, no fim da tarde, sobrecarregavam a rede do bairro. Solução: as coberturas solares produzem energia e fazem sombra. As baterias guardam a sobra do meio-dia e liberam essa energia no horário de pico, aliviando os transformadores.' },
+    ],
+    eolica: [
+      { spr: 'dessalinizadora', nome: 'Dessalinizadora movida a vento e sol', texto: 'Problema: na vila do litoral semiárido falta água potável na estiagem, e a água do poço é salobra. Solução: um aerogerador de pequeno porte e painéis solares alimentam as bombas da dessalinização por osmose reversa. A água potável fica no reservatório, e a salmoura volta diluída ao mar.' },
+    ],
+    hidro: [
+      { spr: 'bombeamentoSolar', nome: 'Irrigação com bombeamento solar', texto: 'Problema: os agricultores usavam bombas a diesel e tiravam água demais do rio na seca. Solução: painéis solares acionam a bomba durante o dia e enchem uma caixa-d\'água elevada, que funciona como uma bateria de água. Ela desce por gravidade para o gotejamento, que gasta bem menos água.' },
+    ],
+    mare: [
+      { spr: 'fabricaGelo', nome: 'Fábrica de gelo solar para a pesca', texto: 'Problema: sem gelo barato, parte do pescado estragava antes de chegar ao mercado, e o gerador a diesel custava caro. Solução: os painéis no telhado fazem gelo durante o dia, e o próprio gelo guarda o frio para a noite, como uma bateria térmica. Os pescadores conservam o peixe e gastam menos com combustível.' },
+    ],
+    geo: [
+      { spr: 'centralCalor', nome: 'Central de calor geotérmico em cascata', texto: 'Problema: casas e estufas da vila queimavam lenha e gás para se aquecer. Solução: a água quente do poço passa por um trocador de calor e é usada em cascata: primeiro aquece as casas, depois a estufa e, já morna, os tanques de peixes. No fim, volta ao subsolo pelo poço de reinjeção, para o reservatório não se esgotar.' },
+    ],
+    cana: [
+      { spr: 'postoBiometano', nome: 'Biometano da vinhaça abastecendo a frota', texto: 'Problema: a vinhaça sem tratamento polui rios, e os caminhões canavieiros queimam muito diesel. Solução: biodigestores transformam a vinhaça em biogás. Depois de purificado, ele vira biometano e abastece caminhões e tratores no posto da usina. O que sobra da digestão volta ao canavial como adubo.' },
+    ],
+    residuos: [
+      { spr: 'aterroEnergia', nome: 'Aterro sanitário que gera energia', texto: 'Problema: o lixo em decomposição solta metano, um gás que aquece o planeta muito mais que o gás carbônico. Solução: drenos captam o biogás do aterro e o levam a motogeradores que produzem eletricidade; a sobra é queimada no queimador. Sobre as células já encerradas, cobertas de terra e grama, foram instalados painéis solares.' },
+    ],
+    floresta: [
+      { spr: 'comunidadeSolar', nome: 'Comunidade ribeirinha com sol e baterias', texto: 'Problema: a comunidade dependia de diesel trazido de barco por dias de viagem, caro e poluente. Solução: painéis solares nas palafitas e um banco de baterias formam uma pequena rede isolada, chamada microrrede. A energia limpa liga o freezer da cooperativa, o purificador de água e o barco elétrico da escola.' },
+    ],
+    mineracao: [
+      { spr: 'correiaSolar', nome: 'Mina com correia transportadora e caminhões elétricos', texto: 'Problema: caminhões a diesel subiam a rampa da cava o dia inteiro, queimando combustível e levantando poeira. Solução: uma correia transportadora movida pela usina solar leva o minério até o beneficiamento. Os caminhões elétricos recarregam na estação ao lado e recuperam parte da energia ao frear nas descidas.' },
+    ],
+    dados: [
+      { spr: 'reusoSolarDC', nome: 'Resfriamento com água de reúso e sol flutuante', texto: 'Problema: o data center usava muita água potável para resfriar os servidores e disputava essa água com a cidade na estiagem. Solução: uma estação trata o esgoto e fornece água de reúso para o resfriamento. Sobre a lagoa de água tratada, painéis solares flutuantes geram energia e diminuem a evaporação.' },
+    ],
+    rede: [
+      { spr: 'usinaVirtual', nome: 'Usina virtual de baterias do bairro', texto: 'Problema: no fim da tarde, quando o sol se põe e todos chegam em casa, o consumo dispara e a rede precisava ligar termelétricas. Solução: baterias de bairro, carros elétricos e casas com painéis são coordenados por um programa, como se fossem uma única usina. Eles guardam a energia solar do dia e a devolvem no pico da noite.' },
+    ],
+  };
+  ERS.infoArranjo = (a) => ({ titulo: 'Arranjo limpo: ' + a.nome, texto: a.texto });
 })();

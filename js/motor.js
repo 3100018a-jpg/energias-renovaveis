@@ -238,14 +238,15 @@
     for (let soma = 0; soma <= 2 * N - 2; soma++) {
       const atual = (M._filaEstrada = []);
       const wyBase = soma * 16;
-      if (wyBase - 14 * HZ > y0 + L || wyBase + 48 + 6 * HZ < y0 - 20) { pistas(pend); pend = atual; continue; }
+      if (wyBase - 14 * HZ > y0 + L || wyBase + 48 + 12 * HZ < y0 - 20) { pistas(pend); pend = atual; continue; }
       for (let x = Math.max(0, soma - N + 1); x <= Math.min(N - 1, soma); x++) {
         const y = soma - x;
         const wx = (x - y) * 32;
         if (wx + 34 < x0 || wx - 34 > x0 + L) continue;
         if (wx < r.x0 - 70 || wx > r.x1 + 70 || wyBase < r.y0 - 260 || wyBase > r.y1 + 40) continue;
         const h = m.alt[y * N + x];
-        if (wyBase - h * HZ - 4 > y0 + L || wyBase + 34 + (h + 4) * HZ < y0) continue;
+        // tiles abaixo do nível do mar (cavas, lagos de mina) são desenhados mais para baixo
+        if (wyBase - h * HZ - 4 > y0 + L || wyBase + 34 - Math.min(0, h) * HZ + (Math.max(0, h) + 4) * HZ < y0) continue;
         M.pintarTile(c, x, y, det);
       }
       pistas(pend); pend = atual;
@@ -292,7 +293,7 @@
   // ruído determinístico por tile
   const rnd = (x, y, k) => { const n = Math.sin(x * 127.1 + y * 311.7 + k * 74.7) * 43758.5453; return n - Math.floor(n); };
   const DURO = new Set([T.ESTRADA, T.PONTE, T.URBANO, T.PATIO, T.CAIS]);
-  const VEGETAL = new Set([T.GRAMA, T.FLORESTA, T.PASTO, T.AGROFLORESTA, T.LAVOURA, T.CANA, T.CANA_COLHIDA, T.GRAMA_SECA, T.MANGUE]);
+  const VEGETAL = new Set([T.GRAMA, T.FLORESTA, T.PASTO, T.AGROFLORESTA, T.LAVOURA, T.CANA, T.CANA_COLHIDA, T.GRAMA_SECA, T.MANGUE, T.CERRADO, T.VARZEA]);
   M.pintarTile = function (c, x, y, det) {
     const m = M.mapa;
     const t = m.T(x, y), h = m.H(x, y);
@@ -303,11 +304,58 @@
     const hl = m.dentro(x, y + 1) ? m.H(x, y + 1) : Math.min(0, h);
     const hr = m.dentro(x + 1, y) ? m.H(x + 1, y) : Math.min(0, h);
     const corLado = pr.lado || '#2a7cc4';
-    const lado = (pts, escurecer, dh, k) => {
+    const lado = (pts, escurecer, dh, k, nb) => {
       c.beginPath(); c.moveTo(pts[0][0], pts[0][1]); for (let i = 1; i < 4; i++) c.lineTo(pts[i][0], pts[i][1]); c.closePath();
       const g = c.createLinearGradient(0, Math.min(pts[0][1], pts[1][1]), 0, Math.max(pts[2][1], pts[3][1]));
       g.addColorStop(0, U.shade(corLado, escurecer + 0.08)); g.addColorStop(1, U.shade(corLado, escurecer - 0.2));
       c.fillStyle = g; c.fill();
+      // faixa horizontal da face, de y0 a y1 (em px abaixo da aresta superior)
+      const faixa = (y0, y1, cor) => {
+        c.fillStyle = cor; c.beginPath();
+        c.moveTo(pts[0][0], pts[0][1] + y0); c.lineTo(pts[1][0], pts[1][1] + y0); c.lineTo(pts[1][0], pts[1][1] + y1); c.lineTo(pts[0][0], pts[0][1] + y1); c.closePath(); c.fill();
+      };
+      const altura = dh * HZ;
+      if (!pr.agua && (t === T.MINA || t === T.RAMPA_MINA || t === T.ESTERIL)) {
+        // bancadas da cava: camadas de laterita, saprolito e rocha alterada
+        const cs = t === T.ESTERIL ? ['rgba(175,165,145,.4)', 'rgba(95,85,70,.32)', 'rgba(140,128,110,.3)'] : ['rgba(205,120,62,.5)', 'rgba(125,62,32,.42)', 'rgba(230,175,112,.4)', 'rgba(160,90,52,.4)'];
+        const fx = altura / Math.max(2, Math.round(dh * 2.5));
+        for (let s2 = 0, i = 0; s2 < altura - 0.1; s2 += fx, i++) faixa(s2, Math.min(altura, s2 + fx), cs[(i + x + y) % cs.length]);
+        if (t !== T.ESTERIL) {
+          // furos de perfuração e desmonte na face da bancada
+          c.strokeStyle = 'rgba(60,30,15,.35)'; c.lineWidth = 0.6;
+          for (let i = 1; i < 6; i++) { const u = i / 6, px = U.lerp(pts[0][0], pts[1][0], u), py = U.lerp(pts[0][1], pts[1][1], u); c.beginPath(); c.moveTo(px, py + 1); c.lineTo(px + 0.4, py + Math.min(altura - 1, HZ * 0.85)); c.stroke(); }
+        }
+        c.fillStyle = 'rgba(255,230,190,.25)'; faixa(0, 1.2, 'rgba(255,230,190,.25)');
+      }
+      if (!pr.agua && (t === T.ROCHA || t === T.BASALTO || t === T.CINZA_VULC || t === T.ENXOFRE)) {
+        // diáclases verticais; no basalto, as colunas de resfriamento
+        const nCol = t === T.BASALTO ? 8 : 4;
+        c.strokeStyle = t === T.BASALTO ? 'rgba(0,0,0,.4)' : 'rgba(30,26,22,.26)'; c.lineWidth = 0.7;
+        for (let i = 1; i < nCol; i++) {
+          const u = (i + (rnd(x, y, i + k * 5) - 0.5) * 0.5) / nCol;
+          const px = U.lerp(pts[0][0], pts[1][0], u), py = U.lerp(pts[0][1], pts[1][1], u);
+          c.beginPath(); c.moveTo(px, py + 0.5); c.lineTo(px + (rnd(y, x, i + k) - 0.5) * 2, py + altura - 0.5); c.stroke();
+        }
+        if (t === T.BASALTO) { c.strokeStyle = 'rgba(160,150,150,.25)'; for (let i = 1; i < nCol; i++) { const u = i / nCol, px = U.lerp(pts[0][0], pts[1][0], u) + 1, py = U.lerp(pts[0][1], pts[1][1], u); c.beginPath(); c.moveTo(px, py + 1); c.lineTo(px, py + altura - 1); c.stroke(); } }
+      }
+      if (!pr.agua && nb !== undefined && T.ehAgua(nb)) {
+        // barranco do rio: solo encharcado na linha d'água, seixos e raízes expostas
+        const base0 = Math.max(0, altura - HZ * 0.75);
+        const gb = c.createLinearGradient(0, Math.min(pts[3][1], pts[2][1]) - HZ * 0.75, 0, Math.max(pts[3][1], pts[2][1]));
+        gb.addColorStop(0, 'rgba(35,26,16,0)'); gb.addColorStop(1, 'rgba(35,26,16,.5)');
+        faixa(base0, altura, gb);
+        for (let i = 0; i < 5; i++) {
+          const u = 0.08 + rnd(x, y, i * 13 + k) * 0.84, px = U.lerp(pts[3][0], pts[2][0], u), py = U.lerp(pts[3][1], pts[2][1], u);
+          c.fillStyle = i % 2 ? '#b9ae98' : '#8d8270'; c.beginPath(); c.ellipse(px, py - 1.4, 1.6, 0.9, 0, 0, 7); c.fill();
+        }
+        if (VEGETAL.has(t)) {
+          c.strokeStyle = 'rgba(96,62,32,.75)'; c.lineWidth = 0.7;
+          for (let i = 0; i < 4; i++) {
+            const u = 0.1 + rnd(y, x, i * 7 + k) * 0.8, px = U.lerp(pts[0][0], pts[1][0], u), py = U.lerp(pts[0][1], pts[1][1], u);
+            c.beginPath(); c.moveTo(px, py + 2); c.quadraticCurveTo(px + 2, py + 4, px + (rnd(x, y, i) - 0.5) * 4, py + Math.min(altura - 1, 7)); c.stroke();
+          }
+        }
+      }
       if (!pr.agua) {
         // estratos ondulados e pedrinhas
         c.strokeStyle = 'rgba(40,25,15,.10)'; c.lineWidth = 0.7;
@@ -336,8 +384,9 @@
         }
       }
     };
-    if (hl < h && t !== T.PONTE) lado([[sx - 32, sy + 16], [sx, sy + 32], [sx, sy + 32 + (h - hl) * HZ], [sx - 32, sy + 16 + (h - hl) * HZ]], -0.02, h - hl, 1);
-    if (hr < h && t !== T.PONTE) lado([[sx, sy + 32], [sx + 32, sy + 16], [sx + 32, sy + 16 + (h - hr) * HZ], [sx, sy + 32 + (h - hr) * HZ]], -0.24, h - hr, 2);
+    const tl = m.dentro(x, y + 1) ? m.T(x, y + 1) : T.MAR, tr = m.dentro(x + 1, y) ? m.T(x + 1, y) : T.MAR;
+    if (hl < h && t !== T.PONTE) lado([[sx - 32, sy + 16], [sx, sy + 32], [sx, sy + 32 + (h - hl) * HZ], [sx - 32, sy + 16 + (h - hl) * HZ]], -0.02, h - hl, 1, tl);
+    if (hr < h && t !== T.PONTE) lado([[sx, sy + 32], [sx + 32, sy + 16], [sx + 32, sy + 16 + (h - hr) * HZ], [sx, sy + 32 + (h - hr) * HZ]], -0.24, h - hr, 2, tr);
     // ---- topo ----
     if (t === T.ESTRADA || t === T.PONTE) { M.pintarEstrada(c, x, y, sx, sy, t); return; }
     const v = (x * 7 + y * 13 + ((x * y) % 5)) & 3;
@@ -379,6 +428,36 @@
         g.addColorStop(0, `rgba(10,25,20,${Math.min(0.32, 0.14 * (hn - h))})`); g.addColorStop(1, 'rgba(10,25,20,0)');
         c.fillStyle = g; c.beginPath(); c.moveTo(q[2], q[3]); c.lineTo(q[4], q[5]); c.lineTo(cx, cy); c.closePath(); c.fill();
       }
+      const aguaAqui = T.ehAgua(t), aguaLa = T.ehAgua(tn);
+      // água rasa junto à margem (também quando o barranco é mais alto que a água)
+      if (aguaAqui && !aguaLa && tn !== T.PONTE && hn >= h) {
+        if (t === T.OLEO || t === T.REJEITO) return;
+        grad(q, t === T.LAGO_CAVA ? '#a8ecd8' : t === T.RIO ? '#93dccf' : '#9fe8ff', 0.55, 0.9);
+        // fundo arenoso visível perto da margem
+        c.fillStyle = 'rgba(214,196,150,.22)';
+        for (let i = 0; i < 3; i++) { const u = 0.15 + rnd(x, y, i + k * 3) * 0.7, px = U.lerp(q[2], q[4], u), py = U.lerp(q[3], q[5], u); c.beginPath(); c.ellipse(U.lerp(px, cx, 0.12), U.lerp(py, cy, 0.12), 3, 1.3, 0, 0, 7); c.fill(); }
+        return;
+      }
+      // margem de terra: faixa de areia ou lama, seixos e juncos na beira d'água
+      if (!aguaAqui && aguaLa && t !== T.CAIS && t !== T.PATIO && t !== T.URBANO && t !== T.LAVA) {
+        const corM = t === T.AREIA ? '#e8d3a0' : t === T.MANGUE ? '#6a5a3e' : t === T.VARZEA ? '#7a6a48' : '#a08a5e';
+        grad(q, corM, 0.75, 0.32);
+        for (let i = 0; i < 5; i++) {
+          const u = 0.1 + rnd(x, y, i * 3 + k) * 0.8, w = 0.04 + rnd(y, x, i + k * 7) * 0.14;
+          const px = U.lerp(q[2], q[4], u), py = U.lerp(q[3], q[5], u);
+          c.fillStyle = i % 2 ? 'rgba(200,190,170,.85)' : 'rgba(120,110,95,.7)';
+          c.beginPath(); c.ellipse(U.lerp(px, cx, w), U.lerp(py, cy, w), 1.1 + rnd(x, y, i) * 0.9, 0.6 + rnd(y, x, i) * 0.4, 0, 0, 7); c.fill();
+        }
+        if (VEGETAL.has(t) && t !== T.CANA && t !== T.LAVOURA) {
+          c.strokeStyle = 'rgba(70,120,40,.85)'; c.lineWidth = 0.7;
+          for (let i = 0; i < 6; i++) {
+            const u = 0.1 + rnd(y, x, i * 5 + k) * 0.8, w = 0.12 + rnd(x, y, i * 11 + k) * 0.16;
+            const px = U.lerp(U.lerp(q[2], q[4], u), cx, w), py = U.lerp(U.lerp(q[3], q[5], u), cy, w);
+            c.beginPath(); c.moveTo(px, py); c.lineTo(px - 0.8, py - 3.4); c.moveTo(px, py); c.lineTo(px + 0.9, py - 3); c.stroke();
+          }
+        }
+        if (hn !== h) return;
+      }
       if (hn !== h || tn === t) return;
       if (pr.agua && !pn.agua) {
         // água rasa turquesa e espuma junto à margem
@@ -399,6 +478,28 @@
         }
       }
     });
+    if (t === T.RIO || t === T.LAGO_CAVA) {
+      const ag = (dx, dy) => !m.dentro(x + dx, y + dy) || T.ehAgua(m.T(x + dx, y + dy)) || m.T(x + dx, y + dy) === T.PONTE;
+      // canal mais fundo (mais escuro) longe das margens
+      if (ag(1, 0) && ag(-1, 0) && ag(0, 1) && ag(0, -1)) {
+        const fundo = ag(2, 0) && ag(-2, 0) && ag(0, 2) && ag(0, -2);
+        c.fillStyle = `rgba(6,40,92,${fundo ? 0.2 : 0.11})`; c.fillRect(sx - 33, sy - 1, 66, 34);
+      }
+      // correnteza: riscos alongados no sentido do rio
+      if (t === T.RIO) {
+        const eixoX = ag(1, 0) && ag(-1, 0) && !(ag(0, 1) && ag(0, -1));
+        const eixoY = ag(0, 1) && ag(0, -1) && !(ag(1, 0) && ag(-1, 0));
+        if (eixoX || eixoY) {
+          const S = (u, w) => (eixoX ? [sx + (u - w) * 32, sy + (u + w) * 16] : [sx + (w - u) * 32, sy + (w + u) * 16]);
+          c.strokeStyle = 'rgba(255,255,255,.26)'; c.lineWidth = 0.8;
+          for (let i = 0; i < 2; i++) {
+            const w = 0.25 + i * 0.45 + (rnd(x, y, i + 40) - 0.5) * 0.15, u0 = rnd(y, x, i + 41) * 0.4;
+            const a = S(u0, w), b = S(u0 + 0.3, w + 0.04), d2 = S(u0 + 0.6, w);
+            c.beginPath(); c.moveTo(a[0], a[1]); c.quadraticCurveTo(b[0], b[1], d2[0], d2[1]); c.stroke();
+          }
+        }
+      }
+    }
     if (t === T.MAR_FUNDO) { c.fillStyle = 'rgba(0,20,60,.08)'; c.fillRect(sx - 33, sy - 1, 66, 34); }
     if (t === T.LAVA) { c.fillStyle = 'rgba(255,200,60,.25)'; c.fillRect(sx - 33, sy - 1, 66, 34); }
     c.restore();
@@ -487,7 +588,13 @@
         let p = [(sa[0] + sb[0]) / 2, (sa[1] + sb[1]) / 2];
         if (d < 2) p = [d === 1 ? A[0] + 1 : A[0], U.clamp(p[1], A[1] + 0.24, A[1] + 0.76)];
         else p = [U.clamp(p[0], A[0] + 0.24, A[0] + 0.76), d === 3 ? A[1] + 1 : A[1]];
-        const tg = [(sb[0] - sa[0]) * 0.5, (sb[1] - sa[1]) * 0.5];
+        let tg = [(sb[0] - sa[0]) * 0.5, (sb[1] - sa[1]) * 0.5];
+        // nas pontes e nas cabeceiras a pista segue reta, no eixo do tabuleiro:
+        // a estrada encontra a ponte exatamente no meio e alinhada
+        if (m.T(A[0], A[1]) === T.PONTE || m.T(B[0], B[1]) === T.PONTE) {
+          p = d < 2 ? [d === 1 ? A[0] + 1 : A[0], A[1] + 0.5] : [A[0] + 0.5, d === 3 ? A[1] + 1 : A[1]];
+          tg = [DIR4[d][0] * 0.5, DIR4[d][1] * 0.5];
+        }
         info.set(chave(A[0], A[1], d), { p, t: tg });
         info.set(chave(B[0], B[1], d ^ 1), { p, t: [-tg[0], -tg[1]] });
       }
@@ -514,7 +621,9 @@
     const lig = M.ligEstrada(x, y);
     if (lig.length === 2) { const k = M.curvaTile(x, y, din, dout); return bez(k[0], k[1], k[2], k[3], u); }
     if (opostas(din, dout)) return lerp2(A, B, u);
-    return u < 0.5 ? lerp2(A, C, u * 2) : lerp2(C, B, u * 2 - 1);
+    // conversão no cruzamento: arco suave (e não um giro brusco no centro)
+    const v = 1 - u;
+    return [v * v * A[0] + 2 * u * v * C[0] + u * u * B[0], v * v * A[1] + 2 * u * v * C[1] + u * u * B[1]];
   };
 
   // chão sob a estrada: o terreno natural vizinho (ou calçada, na cidade); a pista vem depois
@@ -695,10 +804,17 @@
       if (!m.dentro(q[0], q[1])) return;
       const tn = m.T(q[0], q[1]);
       if (T.ehAgua(tn) || tn === T.PONTE || m.H(q[0], q[1]) < 1) return;
-      const cor = T.props[tn].lado || '#9b6b43', pts = q[2];
+      // onde a estrada chega, o barranco vira um encontro (muro de concreto da cabeceira)
+      const encontro = tn === T.ESTRADA;
+      const cor = encontro ? '#c4bfb4' : T.props[tn].lado || '#9b6b43', pts = q[2];
       const g = c.createLinearGradient(0, pts[0][1], 0, pts[3][1]);
       g.addColorStop(0, U.shade(cor, q[3] + 0.08)); g.addColorStop(1, U.shade(cor, q[3] - 0.2));
       c.fillStyle = g; c.beginPath(); pts.forEach((p2, i) => (i ? c.lineTo(p2[0], p2[1]) : c.moveTo(p2[0], p2[1]))); c.closePath(); c.fill();
+      if (encontro) {
+        c.strokeStyle = 'rgba(60,58,54,.45)'; c.lineWidth = 0.6;
+        for (let i = 1; i < 4; i++) { const u = i / 4, a = [U.lerp(pts[0][0], pts[1][0], u), U.lerp(pts[0][1], pts[1][1], u)]; c.beginPath(); c.moveTo(a[0], a[1]); c.lineTo(a[0], a[1] + HZ); c.stroke(); }
+        c.fillStyle = 'rgba(255,255,255,.35)'; c.beginPath(); c.moveTo(pts[0][0], pts[0][1]); c.lineTo(pts[1][0], pts[1][1]); c.lineTo(pts[1][0], pts[1][1] + 1.2); c.lineTo(pts[0][0], pts[0][1] + 1.2); c.closePath(); c.fill();
+      }
     });
     c.save();
     c.beginPath(); losangoPath(c, sx, sy + HZ); c.clip();
@@ -844,8 +960,13 @@
     }
     const CORES = ['#e04a3a', '#2f7ad2', '#f0c419', '#ffffff', '#2fa05a', '#8a5bd0', '#ff8a3a', '#30c0c0'];
     const nv = Math.round(Math.min(estradas.length / 9, 46) * cfg.veiculos);
+    const ocupados = new Set();
     for (let i = 0; i < nv && estradas.length > 2; i++) {
-      const p = r.pick(estradas);
+      // cada veículo nasce num trecho diferente, longe dos outros
+      let p = null;
+      for (let k = 0; k < 12 && !p; k++) { const q = r.pick(estradas); if (!ocupados.has(q[1] * m.N + q[0])) p = q; }
+      if (!p) continue;
+      for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) ocupados.add((p[1] + dy) * m.N + p[0] + dx);
       // mapas podem dispensar veículos de certa cor (ex.: carro azul em zigue-zague nos canaviais)
       if (m.semCorVeiculo && CORES[i % CORES.length] === m.semCorVeiculo) continue;
       const v0 = { x: p[0], y: p[1], px: p[0], py: p[1], nx: p[0], ny: p[1], nnx: p[0], nny: p[1], t: 0, vel: r.range(1.2, 2.2), cor: CORES[i % CORES.length], tipo: r() < 0.15 ? 'onibus' : r() < 0.25 ? 'caminhao' : 'carro' };
@@ -1059,25 +1180,51 @@
   // posição do veículo sobre a pista desenhada (segue retas e curvas, na mão direita)
   const dirPara = (ax, ay, bx, by) => (bx < ax ? 0 : bx > ax ? 1 : by < ay ? 2 : 3);
   const OPOSTA = [1, 0, 3, 2];
-  function pontoVeic(v, t) {
-    let tx, ty, din, dout, u;
-    if (v.nx === v.x && v.ny === v.y) return [v.x + 0.5, v.y + 0.5, v.x, v.y];
+  // trecho atual: tile, lado de entrada, lado de saída e avanço (0..1) dentro do tile
+  function trechoVeic(v, t) {
     if (t < 0.5) {
-      tx = v.x; ty = v.y; dout = dirPara(v.x, v.y, v.nx, v.ny);
-      din = v.px === v.x && v.py === v.y ? OPOSTA[dout] : dirPara(v.x, v.y, v.px, v.py);
-      u = 0.5 + t;
-    } else {
-      tx = v.nx; ty = v.ny; din = dirPara(v.nx, v.ny, v.x, v.y);
-      dout = v.nnx === v.nx && v.nny === v.ny ? din : dirPara(v.nx, v.ny, v.nnx, v.nny);
-      u = t - 0.5;
+      const dout = dirPara(v.x, v.y, v.nx, v.ny);
+      const din = v.px === v.x && v.py === v.y ? OPOSTA[dout] : dirPara(v.x, v.y, v.px, v.py);
+      return { tx: v.x, ty: v.y, din, dout, u: 0.5 + t };
     }
-    const q = M.trilhaEstrada(tx, ty, din, dout, Math.min(1, Math.max(0, u)));
-    return [tx + q[0], ty + q[1], tx, ty];
+    const din = dirPara(v.nx, v.ny, v.x, v.y);
+    const dout = v.nnx === v.nx && v.nny === v.ny ? din : dirPara(v.nx, v.ny, v.nnx, v.nny);
+    return { tx: v.nx, ty: v.ny, din, dout, u: t - 0.5 };
+  }
+  // no fim da via (retorno), o carro vai até perto do centro, gira no próprio eixo da pista e volta
+  const RET0 = 0.36, RET1 = 0.64;
+  function pontoVeic(v, t) {
+    if (v.nx === v.x && v.ny === v.y) return [v.x + 0.5, v.y + 0.5, v.x, v.y];
+    const s = trechoVeic(v, t);
+    const u = Math.min(1, Math.max(0, s.u));
+    let q;
+    if (s.din === s.dout) {
+      const A = MEIO[s.din], K = lerp2(A, [0.5, 0.5], 0.72);
+      q = u < RET0 ? lerp2(A, K, u / RET0) : u > RET1 ? lerp2(K, A, (u - RET1) / (1 - RET1)) : K;
+    } else q = M.trilhaEstrada(s.tx, s.ty, s.din, s.dout, u);
+    return [s.tx + q[0], s.ty + q[1], s.tx, s.ty];
   }
   function posVeiculo(v) {
-    const a = pontoVeic(v, v.t), b = pontoVeic(v, Math.min(0.999, v.t + 0.04));
-    let hx = b[0] - a[0], hy = b[1] - a[1];
-    const d = Math.hypot(hx, hy);
+    const a = pontoVeic(v, v.t);
+    const s = trechoVeic(v, v.t);
+    let hx, hy;
+    if (v.nx !== v.x || v.ny !== v.y) {
+      if (s.din === s.dout && s.u >= RET0 && s.u <= RET1) {
+        // retorno: gira 180° pela esquerda; com o deslocamento para a mão direita,
+        // o carro descreve um semicírculo e sai na outra faixa
+        const ent = [-DIR4[s.din][0], -DIR4[s.din][1]];
+        const ang = Math.PI * U.smooth((s.u - RET0) / (RET1 - RET0));
+        const esq = [ent[1], -ent[0]];
+        hx = Math.cos(ang) * ent[0] + Math.sin(ang) * esq[0];
+        hy = Math.cos(ang) * ent[1] + Math.sin(ang) * esq[1];
+      } else {
+        // direção pela diferença central (mais estável nas curvas e nas emendas)
+        const t0 = Math.max(0, v.t - 0.05), t1 = Math.min(0.999, v.t + 0.05);
+        const p0 = pontoVeic(v, t0), p1 = pontoVeic(v, t1);
+        hx = p1[0] - p0[0]; hy = p1[1] - p0[1];
+      }
+    }
+    const d = Math.hypot(hx || 0, hy || 0);
     if (d > 1e-4) { hx /= d; hy /= d; v.hx = hx; v.hy = hy; } else { hx = v.hx || 1; hy = v.hy || 0; }
     v.fx = a[0] - hy * 0.11; v.fy = a[1] + hx * 0.11;
     v.th = M.mapa.H(a[2], a[3]);
@@ -1085,8 +1232,29 @@
 
   M.atualizarVida = function (dt) {
     const m = M.mapa;
+    // trânsito: cada veículo freia se houver outro logo à frente na mesma faixa
+    // (ou cruzando à frente, dando a vez a quem tem prioridade), em vez de atravessá-lo
+    const V = M.veiculos;
+    for (let i = 0; i < V.length; i++) {
+      const v = V[i];
+      const hx = v.hx || 1, hy = v.hy || 0;
+      let livre = 1;
+      for (let k = 0; k < V.length; k++) {
+        if (k === i) continue;
+        const u = V[k];
+        const dx = u.fx - v.fx, dy = u.fy - v.fy;
+        if (dx * dx + dy * dy > 0.7) continue;
+        const frente = dx * hx + dy * hy, lado = Math.abs(dx * hy - dy * hx);
+        const mesmoSentido = (u.hx || 1) * hx + (u.hy || 0) * hy;
+        const folga = (v.tipo === 'carro' ? 0.5 : 0.62) + (u.tipo === 'carro' ? 0 : 0.12);
+        if (frente > 0.02 && frente < folga && lado < 0.15 && mesmoSentido > 0.3) livre = Math.min(livre, Math.max(0, (frente - 0.34) / (folga - 0.34)));
+        else if (frente > 0.05 && frente < 0.5 && lado < 0.3 && Math.abs(mesmoSentido) < 0.5 && k < i) livre = 0;
+      }
+      v.alvoVel = v.vel * livre;
+    }
     M.veiculos.forEach((v) => {
-      v.t += dt * v.vel;
+      v.va = v.va === undefined ? v.vel : v.va + ((v.alvoVel === undefined ? v.vel : v.alvoVel) - v.va) * Math.min(1, dt * 5);
+      v.t += dt * Math.max(0, v.va);
       if (v.t >= 1) {
         v.t -= 1; v.px = v.x; v.py = v.y; v.x = v.nx; v.y = v.ny; v.nx = v.nnx; v.ny = v.nny;
         const viz = vizEstrada(v.nx, v.ny).filter((p) => !(p[0] === v.x && p[1] === v.y));
@@ -1523,36 +1691,90 @@
     cantos.forEach((p, i) => { const sp = nuvemSprite(i % 3); c.drawImage(sp, p[0] - 130 * p[2], p[1] - 60 * p[2], 260 * p[2], 120 * p[2]); });
   };
 
+  // Veículos em 3D simples, sempre alinhados ao sentido da pista: capô e para-brisa na frente,
+  // faróis brancos na frente, lanternas vermelhas atrás e rodas nas laterais.
   function desenharVeiculo(c, e) {
     const v = e._veic;
     const hx = v.hx || 1, hy = v.hy || 0, nx = -hy, ny = hx;
-    const L = v.tipo === 'onibus' ? 0.42 : v.tipo === 'caminhao' ? 0.36 : 0.26, W = 0.13;
-    const h = v.tipo === 'onibus' ? 9 : v.tipo === 'caminhao' ? 8 : 5;
-    const cor = v.tipo === 'onibus' ? '#2fa05a' : v.cor;
     const P = SPR.P;
-    // cantos no chão, no sentido da pista (frente, direita, trás, esquerda)
-    const canto = (a, b) => [hx * a + nx * b, hy * a + ny * b];
-    const base = [canto(L, -W), canto(L, W), canto(-L, W), canto(-L, -W)];
+    const loc = (a, b) => [hx * a + nx * b, hy * a + ny * b];
+    // retângulo no referencial do veículo: a = ao longo da pista (frente +), b = lateral (direita +)
+    const ret = (a0, a1, b0, b1) => [loc(a1, b0), loc(a1, b1), loc(a0, b1), loc(a0, b0)];
+    const poli = (pts, f, contorno) => {
+      c.beginPath(); c.moveTo(pts[0][0], pts[0][1]); for (let i = 1; i < pts.length; i++) c.lineTo(pts[i][0], pts[i][1]); c.closePath();
+      c.fillStyle = f; c.fill();
+      if (contorno) { c.strokeStyle = contorno; c.lineWidth = 0.5; c.stroke(); }
+    };
+    const luz = (ox, oy) => -0.3 + 0.24 * Math.max(0, oy) / (Math.abs(ox) + Math.abs(oy));
+    // faces visíveis (normal voltada para quem olha) de um prisma com topo opcionalmente recuado
+    // face 0 = frente, 1 = lado direito, 2 = traseira, 3 = lado esquerdo
+    const prisma = (base, topo, z0, z1, corFace, corTopo) => {
+      for (let i = 0; i < 4; i++) {
+        const a = base[i], b = base[(i + 1) % 4], at = topo[i], bt = topo[(i + 1) % 4];
+        const ox = b[1] - a[1], oy = -(b[0] - a[0]);
+        if (ox + oy <= 0.0001) continue;
+        poli([P(a[0], a[1], z0), P(b[0], b[1], z0), P(bt[0], bt[1], z1), P(at[0], at[1], z1)], corFace(i, luz(ox, oy)), 'rgba(20,24,34,.35)');
+      }
+      poli(topo.map((q) => P(q[0], q[1], z1)), corTopo, 'rgba(20,24,34,.3)');
+    };
+    const frenteVis = hx + hy > 0, trasVis = hx + hy < 0, dirVis = nx + ny > 0;
+    // quadrilátero sobre uma face plana (frente/traseira em a fixo, laterais em b fixo)
+    const naFrente = (a, b0, b1, z0, z1, cor) => { const p = loc(a, b0), q = loc(a, b1); poli([P(p[0], p[1], z0), P(q[0], q[1], z0), P(q[0], q[1], z1), P(p[0], p[1], z1)], cor); };
+    const naLateral = (b, a0, a1, z0, z1, cor) => { const p = loc(a0, b), q = loc(a1, b); poli([P(p[0], p[1], z0), P(q[0], q[1], z0), P(q[0], q[1], z1), P(p[0], p[1], z1)], cor); };
+    const rodas = (L, W, lista) => {
+      const b = dirVis ? W : -W;
+      lista.forEach((a) => {
+        const p = loc(a * L, b * 1.02), q = P(p[0], p[1], 1.6);
+        c.fillStyle = '#1b1c20'; c.beginPath(); c.ellipse(q[0], q[1], 2.1, 2.1, 0, 0, 7); c.fill();
+        c.fillStyle = '#9aa0a8'; c.beginPath(); c.ellipse(q[0], q[1], 0.9, 0.9, 0, 0, 7); c.fill();
+      });
+    };
+    const farois = (L, W, z0, z1) => {
+      if (frenteVis) { naFrente(L, -W * 0.92, -W * 0.5, z0, z1, '#fff8d2'); naFrente(L, W * 0.5, W * 0.92, z0, z1, '#fff8d2'); }
+      if (trasVis) { naFrente(-L, -W * 0.92, -W * 0.55, z0, z1, '#e2332b'); naFrente(-L, W * 0.55, W * 0.92, z0, z1, '#e2332b'); }
+    };
+    const VIDRO = '#3c5d78', VIDRO_CLARO = '#7fb3d8';
     c.save(); c.translate(e.wx, e.wy - 2);
-    const poli = (pts, f) => { c.beginPath(); c.moveTo(pts[0][0], pts[0][1]); for (let i = 1; i < pts.length; i++) c.lineTo(pts[i][0], pts[i][1]); c.closePath(); c.fillStyle = f; c.fill(); };
-    poli(base.map((q) => P(q[0] * 1.08, q[1] * 1.15, -1)), 'rgba(0,0,0,.25)');
-    // laterais visíveis (voltadas para quem olha: +x +y)
-    for (let i = 0; i < 4; i++) {
-      const a = base[i], b = base[(i + 1) % 4];
-      const ex = b[0] - a[0], ey = b[1] - a[1];
-      const ox = ey, oy = -ex; // normal para fora (sentido horário)
-      const vis = ox + oy;
-      if (vis <= 0.001) continue;
-      const luz = -0.3 + 0.22 * Math.max(0, oy) / (Math.abs(ox) + Math.abs(oy));
-      poli([P(a[0], a[1], 0), P(b[0], b[1], 0), P(b[0], b[1], h), P(a[0], a[1], h)], U.shade(cor, luz));
-    }
-    poli(base.map((q) => P(q[0], q[1], h)), U.shade(cor, 0.15));
-    if (v.tipo === 'carro') {
-      const vid = [canto(L * 0.5, -W * 0.85), canto(L * 0.5, W * 0.85), canto(-L * 0.45, W * 0.85), canto(-L * 0.45, -W * 0.85)];
-      poli(vid.map((q) => P(q[0], q[1], h + 3)), 'rgba(140,200,240,.95)');
+    if (v.tipo === 'onibus') {
+      const L = 0.44, W = 0.135, cor = '#2fa05a';
+      poli(ret(-L * 1.05, L * 1.05, -W * 1.2, W * 1.2).map((q) => P(q[0], q[1], -1)), 'rgba(0,0,0,.25)');
+      const corpo = ret(-L, L, -W, W);
+      prisma(corpo, corpo, 1, 11, (i, l) => U.shade(i === 0 ? '#f2f4f2' : cor, l), U.shade('#e8ece8', 0.05));
+      // faixa de janelas nas laterais, para-brisa grande e letreiro na frente
+      if (dirVis) naLateral(W, -L * 0.88, L * 0.8, 5.2, 9, VIDRO); else naLateral(-W, -L * 0.88, L * 0.8, 5.2, 9, VIDRO);
+      if (frenteVis) { naFrente(L, -W * 0.9, W * 0.9, 3.6, 9.2, VIDRO_CLARO); naFrente(L, -W * 0.7, W * 0.7, 9.6, 10.6, '#ffb21e'); }
+      if (trasVis) naFrente(-L, -W * 0.8, W * 0.8, 6.5, 9.5, VIDRO);
+      farois(L, W, 1.8, 3);
+      rodas(L, W, [0.68, -0.6]);
+      // ar-condicionado no teto
+      const ac = ret(-L * 0.3, L * 0.2, -W * 0.6, W * 0.6);
+      prisma(ac, ac, 11, 12.6, (i, l) => U.shade('#c9ccd0', l), '#dfe2e6');
+    } else if (v.tipo === 'caminhao') {
+      const L = 0.38, W = 0.13, corCab = v.cor;
+      poli(ret(-L * 1.05, L * 1.05, -W * 1.2, W * 1.2).map((q) => P(q[0], q[1], -1)), 'rgba(0,0,0,.25)');
+      const chassi = ret(-L, L * 0.5, -W * 0.8, W * 0.8);
+      prisma(chassi, chassi, 0.8, 2.2, (i, l) => U.shade('#3a3d44', l), '#2a2c31');
+      const bau = ret(-L, L * 0.34, -W, W);
+      prisma(bau, bau, 2.2, 11, (i, l) => U.shade('#e9e5dc', l), '#f4f1ea');
+      const cab = ret(L * 0.42, L, -W, W), cabTopo = ret(L * 0.42, L * 0.86, -W * 0.95, W * 0.95);
+      prisma(cab, cabTopo, 1, 8.4, (i, l) => U.shade(corCab, l), U.shade(corCab, 0.12));
+      if (frenteVis) naFrente(L * 0.97, -W * 0.85, W * 0.85, 4.8, 7.6, VIDRO_CLARO);
+      if (dirVis) naLateral(W, L * 0.5, L * 0.84, 4.8, 7.4, VIDRO); else naLateral(-W, L * 0.5, L * 0.84, 4.8, 7.4, VIDRO);
+      farois(L, W, 1.8, 2.9);
+      rodas(L, W, [0.74, -0.35, -0.72]);
     } else {
-      const fr = [canto(L * 0.98, -W * 0.8), canto(L * 0.98, W * 0.8)];
-      c.strokeStyle = 'rgba(160,215,245,.95)'; c.lineWidth = 1.6; const a = P(fr[0][0], fr[0][1], h - 2), b = P(fr[1][0], fr[1][1], h - 2); c.beginPath(); c.moveTo(a[0], a[1]); c.lineTo(b[0], b[1]); c.stroke();
+      const L = 0.25, W = 0.118, cor = v.cor;
+      poli(ret(-L * 1.08, L * 1.08, -W * 1.25, W * 1.25).map((q) => P(q[0], q[1], -1)), 'rgba(0,0,0,.25)');
+      const corpo = ret(-L, L, -W, W), corpoTopo = ret(-L * 0.96, L * 0.94, -W * 0.96, W * 0.96);
+      prisma(corpo, corpoTopo, 1, 4.4, (i, l) => U.shade(cor, l), U.shade(cor, 0.16));
+      farois(L, W, 2.2, 3.3);
+      rodas(L, W, [0.62, -0.6]);
+      // cabine deslocada para trás: capô na frente, para-brisa inclinado
+      const cab = ret(-L * 0.7, L * 0.2, -W * 0.9, W * 0.9), cabTopo = ret(-L * 0.6, -L * 0.08, -W * 0.78, W * 0.78);
+      prisma(cab, cabTopo, 4.4, 7.6, (i, l) => (i === 0 ? VIDRO_CLARO : i === 2 ? VIDRO : U.shade(VIDRO, l + 0.2)), U.shade(cor, 0.1));
+      // coluna central entre as janelas laterais
+      const b = dirVis ? W * 0.84 : -W * 0.84, p0 = loc(-L * 0.22, b), q0 = P(p0[0], p0[1], 4.4), q1 = P(p0[0], p0[1], 7.6);
+      c.strokeStyle = U.shade(cor, -0.2); c.lineWidth = 1.1; c.beginPath(); c.moveTo(q0[0], q0[1]); c.lineTo(q1[0], q1[1]); c.stroke();
     }
     c.restore();
   }
@@ -1729,11 +1951,13 @@
       } else if (e.kind === 'lote' && !e.construido) { icone = 'martelo'; cor = '#e0a400'; }
       else if (e.kind === 'problema' && !e.resolvido) { icone = 'alerta'; cor = '#e0482a'; }
       else if (e.kind === 'info' && !e.lido) { icone = 'info'; cor = '#2a7fd0'; }
+      else if (e.kind === 'arranjo' && !e.lido) { icone = 'raio'; cor = '#1f9e5a'; }
       if (!icone) return;
       let x = e.wx, y;
       if (e.kind === 'npc') y = e.wy - 52;
       else if (e.kind === 'lote') { const cc = M.canto(e.x + e.fp[0] / 2, e.y + e.fp[1] / 2, e.hBase); x = cc[0]; y = cc[1] - 30; }
       else if (e.kind === 'problema') { y = e.bb[1] + 10; if (e.fp) x = M.canto(e.x + e.fp[0] / 2, e.y + e.fp[1] / 2, e.hBase)[0]; }
+      else if (e.kind === 'arranjo') { const cc = M.canto(e.x + e.fp[0] / 2, e.y + e.fp[1] / 2, e.hBase); x = cc[0]; y = Math.max(e.bb[1] + 20, cc[1] - 58); }
       else y = e.bb[1] - 6;
       y += bob;
       c.save();
@@ -1779,6 +2003,7 @@
       else if (e.kind === 'npc' && e.marcador === 'narrador') cor = '#b59cff';
       else if (e.kind === 'lote' && !e.construido) cor = '#ffe14a';
       else if (e.kind === 'problema' && !e.resolvido) cor = '#ff4a2a';
+      else if (e.kind === 'arranjo') cor = '#2fe08a';
       if (!cor) return;
       const px = (e.wx - r.x0) * mm.kx, py = (e.wy - r.y0) * mm.ky;
       c.fillStyle = cor; c.beginPath(); c.arc(px, py, e.kind === 'pin' ? 4 : 3, 0, 7); c.fill(); c.strokeStyle = '#fff'; c.lineWidth = 1; c.stroke();

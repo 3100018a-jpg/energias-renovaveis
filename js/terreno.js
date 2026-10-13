@@ -38,6 +38,14 @@
     ['NEVE', '#f4f6f8', '#b8bcc4', 1, 0],
     ['CINZA_VULC', '#5a524c', '#3e3833', 1, 0],
     ['CANA_COLHIDA', '#bfa75a', '#9b6b43', 1, 0],
+    // solos e superfícies acrescentados para mapas mais próximos da realidade
+    ['BASALTO', '#3f3b3d', '#2b2729', 1, 0],      // lava resfriada (derrames antigos)
+    ['CERRADO', '#b9c46a', '#a0643a', 1, 0],      // capim dourado com arbustos tortuosos
+    ['VARZEA', '#6fb469', '#6a5236', 1, 0],       // campo úmido na beira do rio
+    ['ESTERIL', '#a49783', '#7d705f', 1, 0],      // pilha de estéril da mineração
+    ['RAMPA_MINA', '#cfae80', '#a0623a', 1, 0],   // estrada de serviço (rampa) dentro da cava
+    ['LAGO_CAVA', '#2f9e95', '#8fe0d0', 0, 1],    // água acumulada no fundo da cava
+    ['ENXOFRE', '#d8c64c', '#6f685c', 1, 0],      // crosta de enxofre em volta das fumarolas
   ];
   T.props = [];
   LISTA.forEach((l, i) => {
@@ -86,15 +94,79 @@
       case T.GRAMA_SECA:
         pinc(10 * n, [U.shade(base, 0.12), U.shade(base, -0.12)], 2, 6); fios(22 * n, '#a8903f', 3); break;
       case T.FLORESTA:
-        pinc(18 * n, ['#3f8a30', '#5aa83f', '#356f2a', '#6a4a2a'], 1.5, 5); break;
+        pinc(18 * n, ['#3f8a30', '#5aa83f', '#356f2a', '#6a4a2a'], 1.5, 5);
+        // serrapilheira (folhas caídas) e sub-bosque
+        for (let i = 0; i < 12 * n; i++) { c.fillStyle = ['rgba(150,100,40,.55)', 'rgba(200,150,60,.45)', 'rgba(90,60,30,.5)'][i % 3]; c.beginPath(); c.ellipse(r() * 64, r() * 32, 1.1, 0.6, r() * 3, 0, 7); c.fill(); }
+        fios(10 * n, '#2f6a28', 3.4);
+        break;
       case T.AGROFLORESTA:
         pinc(12 * n, ['#5aa83f', '#8ac85a', '#6a4a2a'], 1.5, 4);
         c.strokeStyle = 'rgba(90,60,30,.35)'; c.lineWidth = 2;
         for (let i = -2; i < 6; i++) { c.beginPath(); c.moveTo(i * 12, 0); c.lineTo(i * 12 + 32, 32); c.stroke(); }
         break;
-      case T.PASTO:
-        pinc(10 * n, [U.shade(base, 0.12), U.shade(base, -0.08)], 2, 6); fios(18 * n, U.shade(base, -0.2), 3);
+      case T.PASTO: {
+        pinc(10 * n, [U.shade(base, 0.12), U.shade(base, -0.08), '#c9d47a'], 2, 6);
+        // trilhas de gado: caminhos estreitos de capim pisoteado
+        if (v !== 3) {
+          c.strokeStyle = 'rgba(214,196,130,.75)'; c.lineWidth = 1.3;
+          const y0 = 6 + r() * 20, y1 = 6 + r() * 20;
+          c.beginPath(); c.moveTo(-2, y0); c.bezierCurveTo(20, y0 + r.range(-8, 8), 44, y1 + r.range(-8, 8), 66, y1); c.stroke();
+          c.strokeStyle = 'rgba(150,130,80,.35)'; c.lineWidth = 0.5; c.stroke();
+        }
+        // manchas de solo exposto (pastejo intenso)
+        if (v === 1 || v === 2) { c.fillStyle = 'rgba(176,140,90,.45)'; c.beginPath(); c.ellipse(16 + r() * 32, 8 + r() * 16, r.range(3, 7), r.range(1.5, 3), 0, 0, 7); c.fill(); }
+        fios(20 * n, U.shade(base, -0.22), 3.2); fios(10 * n, '#e4e6a0', 2.4);
+        // touceiras de capim
+        for (let i = 0; i < 4 * n; i++) { const x = r() * 64, y = r() * 32; c.strokeStyle = '#7f9a3a'; c.lineWidth = 0.6; for (let k = -2; k <= 2; k++) { c.beginPath(); c.moveTo(x, y); c.lineTo(x + k * 0.9, y - 2.6 - Math.abs(k) * -0.3); c.stroke(); } }
         break;
+      }
+      case T.CERRADO: {
+        pinc(12 * n, ['#c8cf7a', '#a9b45a', '#d9c879', '#9aa64e'], 2, 6);
+        // solo vermelho aparente entre as touceiras
+        for (let i = 0; i < 5; i++) { c.fillStyle = 'rgba(178,98,58,.35)'; c.beginPath(); c.ellipse(r() * 64, r() * 32, r.range(1.5, 4), r.range(0.8, 2), 0, 0, 7); c.fill(); }
+        fios(24 * n, '#d8c060', 3.6); fios(14 * n, '#8a9a40', 2.8);
+        for (let i = 0; i < 3; i++) { c.fillStyle = r() < 0.5 ? '#6a8a3a' : '#7a9a44'; c.beginPath(); c.arc(r() * 64, r() * 32, r.range(1.2, 2.2), 0, 7); c.fill(); }
+        break;
+      }
+      case T.VARZEA: {
+        pinc(14 * n, ['#5fa85c', '#7cc070', '#4f9a52', '#86c27a'], 2, 6);
+        // poças d'água refletindo o céu
+        for (let i = 0; i < (v === 0 ? 3 : 1); i++) { const x = 10 + r() * 44, y = 6 + r() * 20; c.fillStyle = 'rgba(120,190,220,.55)'; c.beginPath(); c.ellipse(x, y, r.range(2.5, 6), r.range(1, 2.4), 0, 0, 7); c.fill(); c.strokeStyle = 'rgba(255,255,255,.35)'; c.lineWidth = 0.5; c.beginPath(); c.ellipse(x - 1, y - 0.5, 1.5, 0.5, 0, Math.PI, 0); c.stroke(); }
+        fios(26 * n, '#3f8a42', 3.4); fios(12 * n, '#a8d890', 2.8);
+        break;
+      }
+      case T.ESTERIL: {
+        pinc(18 * n, ['#b3a691', '#8f8371', '#c2b6a0', '#7a6f60'], 0.8, 3);
+        for (let i = 0; i < 10; i++) { c.fillStyle = r() < 0.5 ? '#6f6556' : '#cfc3ad'; c.beginPath(); c.arc(r() * 64, r() * 32, r.range(0.6, 1.6), 0, 7); c.fill(); }
+        c.strokeStyle = 'rgba(90,80,60,.35)'; c.lineWidth = 0.8;
+        for (let i = 0; i < 3; i++) { const y = 8 + i * 8 + r() * 2; c.beginPath(); c.moveTo(0, y); c.lineTo(64, y + r.range(-2, 2)); c.stroke(); }
+        break;
+      }
+      case T.RAMPA_MINA: {
+        // cascalho compactado da estrada de serviço, com marcas de pneus e leiras de segurança
+        pinc(12 * n, ['#d8bb8e', '#bf9b6c', '#e4cba0'], 1, 3);
+        c.strokeStyle = 'rgba(120,80,45,.32)'; c.lineWidth = 1.4;
+        for (let i = 0; i < 2; i++) { const y = 10 + i * 10 + r() * 3; c.beginPath(); c.moveTo(4, y); c.bezierCurveTo(20, y + r.range(-4, 4), 44, y + r.range(-4, 4), 60, y + r.range(-2, 2)); c.stroke(); }
+        for (let i = 0; i < 10; i++) { c.fillStyle = r() < 0.5 ? '#8a6a4a' : '#f0dcb4'; c.beginPath(); c.arc(r() * 64, r() * 32, r.range(0.5, 1.1), 0, 7); c.fill(); }
+        break;
+      }
+      case T.ENXOFRE: {
+        pinc(14, ['#e6d45a', '#c9b23a', '#f2e58a', '#b8a24a'], 1.2, 4);
+        for (let i = 0; i < 6; i++) { c.fillStyle = r() < 0.5 ? 'rgba(255,255,240,.7)' : 'rgba(220,120,40,.55)'; c.beginPath(); c.arc(r() * 64, r() * 32, r.range(0.6, 1.4), 0, 7); c.fill(); }
+        c.strokeStyle = 'rgba(90,80,40,.45)'; c.lineWidth = 0.6;
+        for (let i = 0; i < 3; i++) { c.beginPath(); let x = r() * 64, y = r() * 32; c.moveTo(x, y); for (let k = 0; k < 3; k++) { x += r.range(-5, 5); y += r.range(-2.5, 2.5); c.lineTo(x, y); } c.stroke(); }
+        break;
+      }
+      case T.BASALTO: {
+        pinc(10, ['#4a4548', '#2f2b2d', '#55504f'], 2, 6);
+        // superfície em cordas (pahoehoe) e fraturas de resfriamento
+        c.strokeStyle = 'rgba(110,104,100,.55)'; c.lineWidth = 0.7;
+        for (let i = 0; i < 6; i++) { const x = r() * 64, y = r() * 32, rr = r.range(3, 7); c.beginPath(); c.arc(x, y, rr, Math.PI * 1.1, Math.PI * 1.9); c.stroke(); }
+        c.strokeStyle = 'rgba(15,12,14,.7)'; c.lineWidth = 0.8;
+        for (let i = 0; i < 4; i++) { c.beginPath(); let x = r() * 64, y = r() * 32; c.moveTo(x, y); for (let k = 0; k < 3; k++) { x += r.range(-6, 6); y += r.range(-3, 3); c.lineTo(x, y); } c.stroke(); }
+        if (v === 2) { c.fillStyle = 'rgba(120,150,70,.6)'; for (let i = 0; i < 4; i++) { c.beginPath(); c.arc(r() * 64, r() * 32, 1.2, 0, 7); c.fill(); } }
+        break;
+      }
       case T.LAVOURA: {
         c.lineWidth = 3;
         for (let i = -4; i < 10; i++) {
@@ -140,19 +212,48 @@
         c.strokeStyle = 'rgba(200,160,90,.35)'; c.lineWidth = 0.8;
         for (let i = 0; i < 3; i++) { c.beginPath(); const y = 6 + i * 9 + r() * 3; c.moveTo(4, y); c.quadraticCurveTo(32, y - 4, 60, y); c.stroke(); }
         break;
-      case T.TERRA: case T.MINA:
+      case T.TERRA:
         pinc(14 * n, [U.shade(base, 0.12), U.shade(base, -0.15)], 1, 4);
         for (let i = 0; i < 6; i++) { c.fillStyle = '#8a7a6a'; c.beginPath(); c.arc(r() * 64, r() * 32, r.range(0.8, 1.8), 0, 7); c.fill(); }
-        if (tipo === T.MINA) { c.strokeStyle = 'rgba(90,50,20,.4)'; c.lineWidth = 1.2; for (let i = 0; i < 3; i++) { c.beginPath(); c.moveTo(0, 8 + i * 8); c.lineTo(64, 8 + i * 8); c.stroke(); } }
         break;
-      case T.ROCHA:
-        pinc(12 * n, [U.shade(base, 0.15), U.shade(base, -0.15)], 2, 6);
-        c.strokeStyle = 'rgba(60,55,50,.45)'; c.lineWidth = 0.8;
-        for (let i = 0; i < 4; i++) { c.beginPath(); let x = r() * 64, y = r() * 32; c.moveTo(x, y); for (let k = 0; k < 3; k++) { x += r.range(-6, 6); y += r.range(-3, 3); c.lineTo(x, y); } c.stroke(); }
-        if (v === 3) { pinc(4, ['#6aa83f'], 2, 4); }
+      case T.MINA: {
+        // piso da bancada: laterita avermelhada, cascalho e marcas de máquinas
+        const tons = [['#c47a45', '#a85f34', '#d89a62'], ['#b86a3c', '#9a5530', '#cf8a55'], ['#c9895a', '#ad6b40', '#e0a874'], ['#a9643c', '#8e512e', '#c47e50']][v];
+        c.fillStyle = tons[0]; c.fillRect(0, 0, 64, 32);
+        pinc(16 * n, tons, 1, 4);
+        for (let i = 0; i < 9; i++) { c.fillStyle = r() < 0.5 ? '#7d6a5a' : '#e2c29a'; c.beginPath(); c.arc(r() * 64, r() * 32, r.range(0.6, 1.7), 0, 7); c.fill(); }
+        c.strokeStyle = 'rgba(90,50,20,.35)'; c.lineWidth = 1.1;
+        const ang = v % 2 ? 0.5 : -0.5;
+        for (let i = 0; i < 2; i++) { const y = 10 + i * 12 + r() * 3; c.beginPath(); c.moveTo(0, y); c.lineTo(64, y + 64 * ang * 0.25); c.stroke(); }
         break;
+      }
+      case T.ROCHA: {
+        pinc(10 * n, [U.shade(base, 0.12), U.shade(base, -0.12), '#8a8478'], 2, 6);
+        // placas de rocha com aresta iluminada (luz do alto à esquerda) e sombra embaixo
+        for (let i = 0; i < 5; i++) {
+          const x = r() * 64, y = r() * 32, w = r.range(4, 9), h = r.range(2, 4.5);
+          c.beginPath(); c.moveTo(x - w, y); c.lineTo(x - w * 0.3, y - h); c.lineTo(x + w * 0.7, y - h * 0.6); c.lineTo(x + w, y + h * 0.3); c.lineTo(x, y + h * 0.6); c.closePath();
+          c.fillStyle = U.shade(base, r.range(-0.12, 0.1)); c.fill();
+          c.strokeStyle = 'rgba(255,250,235,.35)'; c.lineWidth = 0.7; c.beginPath(); c.moveTo(x - w, y); c.lineTo(x - w * 0.3, y - h); c.lineTo(x + w * 0.7, y - h * 0.6); c.stroke();
+          c.strokeStyle = 'rgba(40,36,32,.35)'; c.beginPath(); c.moveTo(x + w, y + h * 0.3); c.lineTo(x, y + h * 0.6); c.lineTo(x - w, y); c.stroke();
+        }
+        c.strokeStyle = 'rgba(50,46,42,.5)'; c.lineWidth = 0.8;
+        for (let i = 0; i < 3; i++) { c.beginPath(); let x = r() * 64, y = r() * 32; c.moveTo(x, y); for (let k = 0; k < 3; k++) { x += r.range(-6, 6); y += r.range(-3, 3); c.lineTo(x, y); } c.stroke(); }
+        // líquens e musgo
+        for (let i = 0; i < 4; i++) { c.fillStyle = ['rgba(190,200,120,.55)', 'rgba(220,160,70,.45)', 'rgba(120,160,80,.5)'][i % 3]; c.beginPath(); c.arc(r() * 64, r() * 32, r.range(0.8, 1.8), 0, 7); c.fill(); }
+        if (v === 3) { pinc(4, ['#6aa83f', '#7ab84a'], 2, 4); }
+        break;
+      }
       case T.NEVE: pinc(8, ['#ffffff', '#e2e8f0'], 2, 6); break;
-      case T.CINZA_VULC: pinc(14, ['#6a625a', '#423b36'], 1, 4); break;
+      case T.CINZA_VULC: {
+        pinc(14, ['#6a625a', '#423b36', '#5a524c'], 1, 4);
+        // ondulações deixadas pelo vento na cinza e lapilli (pedrinhas vulcânicas)
+        c.strokeStyle = 'rgba(140,130,120,.35)'; c.lineWidth = 0.6;
+        for (let i = 0; i < 4; i++) { const y = 4 + i * 7 + r() * 3; c.beginPath(); c.moveTo(4, y); c.quadraticCurveTo(32, y - 3, 60, y + 1); c.stroke(); }
+        for (let i = 0; i < 8; i++) { c.fillStyle = r() < 0.6 ? '#2e2825' : '#8a4a32'; c.beginPath(); c.arc(r() * 64, r() * 32, r.range(0.5, 1.2), 0, 7); c.fill(); }
+        if (v === 3) for (let i = 0; i < 4; i++) { c.fillStyle = 'rgba(230,210,80,.55)'; c.beginPath(); c.arc(r() * 64, r() * 32, r.range(0.8, 1.8), 0, 7); c.fill(); }
+        break;
+      }
       case T.LAVA: {
         c.fillStyle = '#ff3d10'; c.fillRect(0, 0, 64, 32);
         pinc(10, ['#ffb52e', '#ffd84a', '#c22a08'], 2, 7);
@@ -170,10 +271,20 @@
         pinc(16, ['#3a322c', '#5a4f46', '#2a2420'], 1.5, 5);
         for (let i = 0; i < 4; i++) { c.fillStyle = 'rgba(255,110,30,.8)'; c.beginPath(); c.arc(r() * 64, r() * 32, 0.9, 0, 7); c.fill(); }
         break;
-      case T.LIXO:
-        pinc(10, ['#8a7a5a', '#a6956f'], 2, 5);
-        { const cs = ['#e04a3a', '#3a8ae0', '#f0c419', '#fff', '#4fae3f']; for (let i = 0; i < 18; i++) { c.fillStyle = cs[i % 5]; c.fillRect(r() * 64, r() * 32, 2, 1.4); } }
+      case T.LIXO: {
+        pinc(10, ['#8a7a5a', '#a6956f', '#6f6248'], 2, 5);
+        // manchas escuras de chorume escorrendo pelo solo
+        for (let i = 0; i < 2; i++) { c.fillStyle = 'rgba(50,38,22,.45)'; c.beginPath(); c.ellipse(r() * 64, r() * 32, r.range(4, 9), r.range(1.5, 3), r.range(-0.3, 0.3), 0, 7); c.fill(); }
+        // sacolas, garrafas, papelão e restos misturados
+        const cs = ['#e04a3a', '#3a8ae0', '#f0c419', '#fff', '#4fae3f', '#2a2a2a', '#c9b48a'];
+        for (let i = 0; i < 26; i++) {
+          c.fillStyle = cs[i % cs.length];
+          const x = r() * 64, y = r() * 32;
+          if (i % 3 === 0) { c.beginPath(); c.ellipse(x, y, r.range(1.2, 2.4), r.range(0.8, 1.4), r() * 3, 0, 7); c.fill(); }
+          else c.fillRect(x, y, r.range(1.2, 2.6), r.range(0.8, 1.6));
+        }
         break;
+      }
       case T.MANGUE:
         pinc(14, ['#5f7a3a', '#7a9a4a', '#4a5a2a'], 2, 5);
         c.fillStyle = 'rgba(60,120,140,.35)'; c.beginPath(); c.ellipse(r() * 64, r() * 32, 10, 4, 0, 0, 7); c.fill();
@@ -183,7 +294,9 @@
         c.strokeStyle = 'rgba(90,60,30,.6)'; c.lineWidth = 1;
         for (let i = -4; i < 12; i++) { c.beginPath(); c.moveTo(i * 6, 0); c.lineTo(i * 6 + 32, 32); c.stroke(); }
         break;
-      case T.MAR: case T.MAR_FUNDO: case T.AGUA_RASA: case T.RIO: case T.REJEITO: case T.OLEO: {
+      case T.MAR: case T.MAR_FUNDO: case T.AGUA_RASA: case T.RIO: case T.REJEITO: case T.OLEO: case T.LAGO_CAVA: {
+        if (tipo === T.LAGO_CAVA) { pinc(5, ['rgba(40,140,130,.6)', 'rgba(90,190,170,.4)'], 4, 10); }
+        if (tipo === T.REJEITO) { pinc(6, ['rgba(110,95,65,.55)', 'rgba(150,130,90,.45)'], 3, 9); }
         c.strokeStyle = tipo === T.OLEO ? 'rgba(160,120,255,.25)' : 'rgba(255,255,255,.22)';
         c.lineWidth = 1;
         for (let i = 0; i < 4; i++) { const x = r() * 54, y = 4 + r() * 24; c.beginPath(); c.moveTo(x, y); c.quadraticCurveTo(x + 5, y - 2, x + 10, y); c.stroke(); }

@@ -111,6 +111,7 @@ h3 { font-size: 1.08rem; line-height: 1.25; color: var(--suave); }
 <script src="js/audio.js"></script>
 <script src="js/sprites.js"></script>
 <script src="js/obras.js"></script>
+<script src="js/cenario.js"></script>
 <script src="js/dados.js"></script>
 <script src="js/falas.js"></script>
 <!--/SCRIPTS-->
@@ -188,6 +189,25 @@ h3 { font-size: 1.08rem; line-height: 1.25; color: var(--suave); }
       });
       box.appendChild(grade); sec.appendChild(box);
     });
+    // arranjos de energia limpa já instalados no mapa da missão
+    const arr = (ERS.ARRANJOS && ERS.ARRANJOS[ms.id]) || [];
+    if (arr.length) {
+      const box = document.createElement('div'); box.className = 'lote';
+      box.innerHTML = '<h3>Arranjo de energia limpa instalado no mapa</h3>';
+      const grade = document.createElement('div'); grade.className = 'grade';
+      arr.forEach((a) => {
+        const inf = ERS.infoArranjo(a), fala = ERS.falaInfo(inf);
+        const id = idFala(fala, ms.narrador.voz);
+        const card = document.createElement('article');
+        card.className = 'cartao limpa'; card.dataset.tipo = 'limpa';
+        card.innerHTML = `<canvas width="464" height="264" aria-label="Desenho de ${esc(a.nome)}" role="img"></canvas>` +
+          `<span class="selo limpa">Arranjo limpo</span><h4>${esc(a.nome)}</h4>` +
+          `<p class="fala"><span class="quem">${esc(primeiro(ms.narrador.nome))} lê</span><q>${esc(a.texto)}</q>${botaoOuvir(id)}</p>`;
+        grade.appendChild(card);
+        desenhar.push([card.querySelector('canvas'), a.spr, a.v || 0]);
+      });
+      box.appendChild(grade); sec.appendChild(box);
+    }
     raiz.appendChild(sec);
   });
   document.getElementById('numeros').innerHTML =
