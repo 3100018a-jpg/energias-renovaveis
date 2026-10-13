@@ -408,8 +408,24 @@
     const ms = J.ms, est = J.est;
     ms.problemas.forEach((pb) => { if (est.problemas[pb.id]) modificarTerreno(m, pb); });
   }
-  // efeitos de terreno das soluções de problemas
-  function modificarTerreno(m, pb) {
+  // efeitos de terreno das soluções de problemas (animar = no momento em que o jogador resolve)
+  function modificarTerreno(m, pb, animar) {
+    // barragem de rejeitos desativada: o rio marrom volta a ficar azul, aos poucos
+    if (pb.limparRio && m.rioPos) {
+      const k = ERS.solucaoEscolhida(pb, J.est && J.est.problemas[pb.id]);
+      const sol = ERS.solucoes(pb)[Math.max(0, k)] || {};
+      if (sol.tipo !== 'atencao') {
+        if (animar) M.limparRio(14);
+        else {
+          m.rioLista.forEach((q) => {
+            const i = m.i(q[0], q[1]);
+            if (m.tipo[i] === T.REJEITO) m.tipo[i] = T.RIO;
+            if (m.tipo[i] === T.PONTE && m.aguaSob[i] === T.REJEITO) m.aguaSob[i] = T.RIO;
+          });
+          m.rioPos = null;
+        }
+      }
+    }
     if (pb.apagarFogo) { m.fogo.forEach((f) => (f.apagado = true)); for (let i = 0; i < m.tipo.length; i++) if (m.tipo[i] === T.QUEIMADO) m.tipo[i] = pb.id === 'queima' ? T.CANA : T.GRAMA; m.ents.forEach((e) => { if (e.kind === 'deco' && (e.spr === 'queimada' || e.spr === 'toco')) e.spr = pb.id === 'queima' ? 'arbusto' : 'muda'; }); }
     if (pb.limparOleo) for (let i = 0; i < m.tipo.length; i++) { if (m.tipo[i] === T.OLEO) m.tipo[i] = m.alt[i] > 0 ? T.AREIA : T.MAR; }
     if (pb.plantar) {
@@ -791,7 +807,7 @@
     if (est.creditos < sol.custo) { A.sfx('erro'); A.falar(ERS.FRASES.semCredito, ERS.VOZES[ms.narrador.voz]); toast('Créditos insuficientes', 'ruim'); return; }
     est.creditos -= sol.custo;
     est.problemas[pb.id] = k === 0 ? true : k;
-    modificarTerreno(M.mapa, pb);
+    modificarTerreno(M.mapa, pb, true);
     if (pb.apagarFogo || pb.limparOleo || pb.plantar) {
       M.mapa.ents.forEach((x, i) => { if (x.kind === 'deco' && !x.wx) M.prepararEnt(x, i); });
       M.ordenarEstaticas(); M.reconstruirCache(); M.listarAgua(); M.prepararMinimapa();

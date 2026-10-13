@@ -675,7 +675,7 @@
       { id: 'hibrido', rotulo: 'Platô ao lado da mina', fp: [2, 2], opcoes: ['minaHibrida', 'h2Mina'] },
     ],
     problemas: [
-      { id: 'barragem', nome: 'Barragem de rejeitos em risco', spr: 'lagoRejeito', fp: [2, 2], sprResolvido: 'pilhaSeca', desc: 'Uma barragem antiga guarda lama de rejeitos de mineração acima da vila.', impactos: ['Risco de rompimento', 'Contaminação do rio', 'Ameaça à vida dos moradores'], acao: { rotulo: 'Descaracterizar a barragem e empilhar a seco', custo: 200, ef: { social: 16, agua: 14, bio: 6, co2: -18 } }, fala: 'A lama foi drenada e os rejeitos secos foram empilhados com segurança. A vila pode dormir tranquila.' },
+      { id: 'barragem', nome: 'Barragem de rejeitos em risco', spr: 'lagoRejeito', fp: [2, 2], sprResolvido: 'pilhaSeca', limparRio: true, desc: 'Uma barragem antiga guarda lama de rejeitos de mineração acima da vila.', impactos: ['Risco de rompimento', 'Contaminação do rio', 'Ameaça à vida dos moradores'], acao: { rotulo: 'Descaracterizar a barragem e empilhar a seco', custo: 200, ef: { social: 16, agua: 14, bio: 6, co2: -18 } }, fala: 'A lama foi drenada e os rejeitos secos foram empilhados com segurança. A vila pode dormir tranquila.' },
     ],
     infos: [
       { titulo: 'Terras raras no Brasil', texto: 'O Brasil tem uma das maiores reservas de terras raras do mundo, em estados como Minas Gerais e Goiás. Explorá-las exige licenciamento rigoroso e respeito às comunidades.' },

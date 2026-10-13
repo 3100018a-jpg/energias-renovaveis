@@ -113,10 +113,18 @@ input[type="range"] { width: 100%; accent-color: var(--ouro); }
 
 /* ---------- painel da missão ---------- */
 #painel-missao { position: fixed; z-index: 15; left: 14px; top: 84px; width: 300px; max-height: calc(100% - 300px); overflow: auto; padding: 12px 14px 14px; }
-.recolher { width: 100%; text-align: left; background: none; border: 0; padding: 0 0 6px; cursor: pointer; text-transform: uppercase; letter-spacing: 0.12em; font-size: 0.74rem; font-weight: 700; color: var(--ouro); display: flex; justify-content: space-between; }
-.recolher::after { content: '▾'; }
+.recolher { width: 100%; text-align: left; background: none; border: 0; padding: 0 0 8px; cursor: pointer; text-transform: uppercase; letter-spacing: 0.12em; font-size: 0.8rem; font-weight: 700; color: var(--ouro); display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+/* triângulo da aba Objetivos: botão redondo dourado, bem visível */
+.recolher::after {
+  content: ''; flex: 0 0 auto; width: 28px; height: 28px; border-radius: 50%;
+  background: var(--ouro) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cpath d='M4 6.5h12L10 15z' fill='%230b2a33' stroke='%230b2a33' stroke-width='1.6' stroke-linejoin='round'/%3E%3C/svg%3E") center / 16px no-repeat;
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.85), 0 3px 10px rgba(0, 0, 0, 0.4);
+  transition: transform 0.2s ease, background-color 0.2s ease;
+}
+.recolher:hover::after, .recolher:focus-visible::after { background-color: #ffe08a; transform: scale(1.1); }
 #painel-missao.fechado .painel-corpo { display: none; }
-#painel-missao.fechado .recolher::after { content: '▸'; }
+#painel-missao.fechado .recolher::after { transform: rotate(-90deg); }
+#painel-missao.fechado .recolher:hover::after, #painel-missao.fechado .recolher:focus-visible::after { transform: rotate(-90deg) scale(1.1); }
 .pm-nome { margin: 2px 0 0; font-family: var(--fonte-titulo); font-weight: 400; font-size: 1.3rem; line-height: 1.1; }
 .pm-fonte { margin: 2px 0 10px; color: var(--texto-suave); font-size: 0.85rem; }
 .objetivos { list-style: none; margin: 0 0 12px; padding: 0; display: grid; gap: 7px; }

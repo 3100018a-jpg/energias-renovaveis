@@ -292,7 +292,7 @@
   // ruído determinístico por tile
   const rnd = (x, y, k) => { const n = Math.sin(x * 127.1 + y * 311.7 + k * 74.7) * 43758.5453; return n - Math.floor(n); };
   const DURO = new Set([T.ESTRADA, T.PONTE, T.URBANO, T.PATIO, T.CAIS]);
-  const VEGETAL = new Set([T.GRAMA, T.FLORESTA, T.PASTO, T.AGROFLORESTA, T.LAVOURA, T.CANA, T.GRAMA_SECA, T.MANGUE]);
+  const VEGETAL = new Set([T.GRAMA, T.FLORESTA, T.PASTO, T.AGROFLORESTA, T.LAVOURA, T.CANA, T.CANA_COLHIDA, T.GRAMA_SECA, T.MANGUE]);
   M.pintarTile = function (c, x, y, det) {
     const m = M.mapa;
     const t = m.T(x, y), h = m.H(x, y);
@@ -336,12 +336,12 @@
         }
       }
     };
-    if (hl < h) lado([[sx - 32, sy + 16], [sx, sy + 32], [sx, sy + 32 + (h - hl) * HZ], [sx - 32, sy + 16 + (h - hl) * HZ]], -0.02, h - hl, 1);
-    if (hr < h) lado([[sx, sy + 32], [sx + 32, sy + 16], [sx + 32, sy + 16 + (h - hr) * HZ], [sx, sy + 32 + (h - hr) * HZ]], -0.24, h - hr, 2);
+    if (hl < h && t !== T.PONTE) lado([[sx - 32, sy + 16], [sx, sy + 32], [sx, sy + 32 + (h - hl) * HZ], [sx - 32, sy + 16 + (h - hl) * HZ]], -0.02, h - hl, 1);
+    if (hr < h && t !== T.PONTE) lado([[sx, sy + 32], [sx + 32, sy + 16], [sx + 32, sy + 16 + (h - hr) * HZ], [sx, sy + 32 + (h - hr) * HZ]], -0.24, h - hr, 2);
     // ---- topo ----
     if (t === T.ESTRADA || t === T.PONTE) { M.pintarEstrada(c, x, y, sx, sy, t); return; }
     const v = (x * 7 + y * 13 + ((x * y) % 5)) & 3;
-    c.drawImage(T.textura(t, v, det, M._resTex || 2), sx - 32.5, sy - 0.25, 65, 32.5);
+    M.texAgua(c, t, x, y, v, det, sx - 32.5, sy - 0.25, 65, 32.5);
     const losango = () => { c.beginPath(); c.moveTo(sx, sy - 0.8); c.lineTo(sx + 33, sy + 16); c.lineTo(sx, sy + 32.8); c.lineTo(sx - 33, sy + 16); c.closePath(); };
     c.save();
     losango(); c.clip();
@@ -402,6 +402,7 @@
     if (t === T.MAR_FUNDO) { c.fillStyle = 'rgba(0,20,60,.08)'; c.fillRect(sx - 33, sy - 1, 66, 34); }
     if (t === T.LAVA) { c.fillStyle = 'rgba(255,200,60,.25)'; c.fillRect(sx - 33, sy - 1, 66, 34); }
     c.restore();
+    if (t === T.CANA) c.drawImage(T.canavial((x * 5 + y * 3) & 3, Math.min(3, M._resTex || 2)), sx - 33, sy - T.CANA_ALT, 66, 32 + T.CANA_ALT + 2);
     // espuma (fora do recorte para cruzar as emendas)
     if (pr.agua && t !== T.OLEO && t !== T.REJEITO) {
       viz.forEach((q, k) => {
@@ -520,7 +521,10 @@
   M.pintarEstrada = function (c, x, y, sx, sy, t) {
     const m = M.mapa;
     if (t === T.PONTE) {
-      c.drawImage(T.textura(T.RIO, 0, 1, M._resTex || 2), sx - 32, sy + HZ, 64, 32);
+      // a mesma água que passa sob a ponte (rio, rejeito, lago…), com sombra e pilares
+      const ag = m.aguaSob ? m.aguaSob[m.i(x, y)] : 255;
+      M.texAgua(c, ag === 255 ? T.RIO : ag, x, y, 0, 1, sx - 32.5, sy + HZ - 0.25, 65, 32.5);
+      M.basePonte(c, x, y, sx, sy);
     } else {
       const cont = {};
       let urbano = false;
@@ -573,10 +577,16 @@
     c.clip();
     c.lineCap = 'butt'; c.lineJoin = 'round';
     const W = 15;
+    if (t === T.PONTE && (n === 1 || n === 2)) {
+      c.restore();
+      M.tabuleiroPonte(c, x, y, sx, sy, lig);
+      return;
+    }
     if (t === T.PONTE) {
-      camada('#3b4048', W + 7);
-      camada('#e9e6df', W + 4);
-      camada('#7b818a', W);
+      camada('#4a4f57', W + 9);
+      camada('#d6d1c6', W + 6);
+      camada('#eeebe3', W);
+      camada('#585e68', W - 2.6);
     } else {
       camada(urbano ? '#d8d1c1' : 'rgba(176,156,118,.85)', W + 6);
       camada('#eeebe3', W);
@@ -594,6 +604,195 @@
         c.setLineDash([]);
       }
     }
+    c.restore();
+  };
+
+
+  // ---------- água (com a limpeza gradual do rio de rejeitos) ----------
+  // fração já limpa de um tile do rio de rejeitos (0 = marrom, 1 = azul)
+  M.fatorLimpo = function (x, y) {
+    const m = M.mapa;
+    if (!m.rioPos || !(m.limpeza > 0)) return 0;
+    const p = m.rioPos[m.i(x, y)];
+    if (p < 0) return 0;
+    return U.clamp((m.limpeza * 1.4 - p) / 0.4, 0, 1);
+  };
+  M.texAgua = function (c, tipo, x, y, v, det, dx, dy, w, h) {
+    const res = M._resTex || 2;
+    const k = tipo === T.REJEITO ? M.fatorLimpo(x, y) : 0;
+    if (k <= 0) { c.drawImage(T.textura(tipo, v, det, res), dx, dy, w, h); return; }
+    c.drawImage(T.textura(T.RIO, v, det, res), dx, dy, w, h);
+    if (k < 1) { c.globalAlpha = 1 - k; c.drawImage(T.textura(T.REJEITO, v, det, res), dx, dy, w, h); c.globalAlpha = 1; }
+  };
+  // a cor do rio muda aos poucos, de montante para jusante
+  M.limparRio = function (duracao, aoTerminar) {
+    const m = M.mapa;
+    if (!m || !m.rioPos) return;
+    if (m._limpando) clearInterval(m._limpando);
+    m.limpeza = m.limpeza || 0;
+    const passo = 0.35, inc = passo / duracao;
+    const lista = m.rioLista || [];
+    const finalizar = () => {
+      lista.forEach((q) => {
+        const i = m.i(q[0], q[1]);
+        if (m.tipo[i] === T.REJEITO) m.tipo[i] = T.RIO;
+        if (m.tipo[i] === T.PONTE && m.aguaSob[i] === T.REJEITO) m.aguaSob[i] = T.RIO;
+      });
+      m.limpeza = 0; m.rioPos = null;
+      if (M.mapa === m) { M.reconstruirCache(); M.listarAgua(); M.prepararMinimapa(); }
+      if (aoTerminar) aoTerminar();
+    };
+    m._limpando = setInterval(() => {
+      if (M.mapa !== m) { clearInterval(m._limpando); m._limpando = null; finalizar(); return; }
+      const antes = m.limpeza;
+      m.limpeza = Math.min(1, m.limpeza + inc);
+      // repinta só os trechos cuja cor mudou neste passo
+      let x0 = 1e9, y0 = 1e9, x1 = -1, y1 = -1;
+      lista.forEach((q) => {
+        const p = m.rioPos[m.i(q[0], q[1])];
+        const ka = U.clamp((antes * 1.4 - p) / 0.4, 0, 1), kb = U.clamp((m.limpeza * 1.4 - p) / 0.4, 0, 1);
+        if (ka !== kb) { x0 = Math.min(x0, q[0]); y0 = Math.min(y0, q[1]); x1 = Math.max(x1, q[0]); y1 = Math.max(y1, q[1]); }
+      });
+      if (x1 >= 0) M.pintarArea([x0 - 1, y0 - 1, x1 + 1, y1 + 1]);
+      if (m.limpeza >= 1) { clearInterval(m._limpando); m._limpando = null; finalizar(); }
+    }, passo * 1000);
+  };
+
+  // ---------- pontes ----------
+  // eixo da pista no tile (coordenadas locais 0..1): pontos e tangentes unitárias
+  function eixoPonte(x, y, lig) {
+    const out = [];
+    if (lig.length === 2) {
+      const k = M.curvaTile(x, y, lig[0], lig[1]);
+      for (let i = 0; i <= 12; i++) {
+        const u = i / 12;
+        const p = bez(k[0], k[1], k[2], k[3], u);
+        const a = bez(k[0], k[1], k[2], k[3], Math.max(0, u - 0.02)), b = bez(k[0], k[1], k[2], k[3], Math.min(1, u + 0.02));
+        const L = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1;
+        out.push([p[0], p[1], (b[0] - a[0]) / L, (b[1] - a[1]) / L]);
+      }
+    } else if (lig.length === 1) {
+      const A = MEIO[lig[0]], d = [0.5 - A[0], 0.5 - A[1]], L = Math.hypot(d[0], d[1]);
+      for (let i = 0; i <= 6; i++) { const u = i / 6; out.push([A[0] + d[0] * u, A[1] + d[1] * u, d[0] / L, d[1] / L]); }
+    }
+    return out;
+  }
+  const LARG_PONTE = 0.36, LARG_GUARDA = 0.33, ALT_GUARDA = 6;
+  // borda do tabuleiro deslocada para um dos lados (s = +1 ou -1)
+  const bordaPonte = (eixo, w, s) => eixo.map((q) => [q[0] - q[3] * w * s, q[1] + q[2] * w * s]);
+  const losangoPath = (c, ox, oy, sobe) => {
+    sobe = sobe || 0;
+    c.moveTo(ox, oy - 0.6 - sobe); c.lineTo(ox + 32.6, oy + 16 - sobe); c.lineTo(ox + 32.6, oy + 16); c.lineTo(ox, oy + 32.6); c.lineTo(ox - 32.6, oy + 16); c.lineTo(ox - 32.6, oy + 16 - sobe); c.closePath();
+  };
+  // por baixo do tabuleiro: sombra na água e pilares com espuma na linha d'água
+  M.basePonte = function (c, x, y, sx, sy) {
+    const m = M.mapa;
+    const lig = M.ligEstrada(x, y);
+    const S = (p, dy) => [sx + (p[0] - p[1]) * 32, sy + (p[0] + p[1]) * 16 + (dy || 0)];
+    // atrás da ponte, onde há margem ou cabeceira mais alta que a água, aparece o barranco
+    [[x - 1, y, [[sx - 32, sy + 16], [sx, sy], [sx, sy + HZ], [sx - 32, sy + 16 + HZ]], -0.24],
+     [x, y - 1, [[sx, sy], [sx + 32, sy + 16], [sx + 32, sy + 16 + HZ], [sx, sy + HZ]], -0.02]].forEach((q) => {
+      if (!m.dentro(q[0], q[1])) return;
+      const tn = m.T(q[0], q[1]);
+      if (T.ehAgua(tn) || tn === T.PONTE || m.H(q[0], q[1]) < 1) return;
+      const cor = T.props[tn].lado || '#9b6b43', pts = q[2];
+      const g = c.createLinearGradient(0, pts[0][1], 0, pts[3][1]);
+      g.addColorStop(0, U.shade(cor, q[3] + 0.08)); g.addColorStop(1, U.shade(cor, q[3] - 0.2));
+      c.fillStyle = g; c.beginPath(); pts.forEach((p2, i) => (i ? c.lineTo(p2[0], p2[1]) : c.moveTo(p2[0], p2[1]))); c.closePath(); c.fill();
+    });
+    c.save();
+    c.beginPath(); losangoPath(c, sx, sy + HZ); c.clip();
+    let eixo = eixoPonte(x, y, lig);
+    if (!eixo.length) eixo = [[0.5, 0.5, 1, 0]];
+    // sombra projetada na água (luz vinda do alto à esquerda)
+    if (eixo.length > 1) {
+      const e1 = bordaPonte(eixo, LARG_PONTE, 1), e2 = bordaPonte(eixo, LARG_PONTE, -1).reverse();
+      c.fillStyle = 'rgba(8,24,40,.3)';
+      c.beginPath(); e1.concat(e2).forEach((p, i) => { const q = S(p, HZ + 3); i ? c.lineTo(q[0] + 5, q[1]) : c.moveTo(q[0] + 5, q[1]); }); c.closePath(); c.fill();
+    } else { const q = S([0.5, 0.5], HZ + 3); c.fillStyle = 'rgba(8,24,40,.3)'; c.beginPath(); c.ellipse(q[0] + 5, q[1], 20, 10, 0, 0, 7); c.fill(); }
+    c.restore();
+    // pilares no meio do vão
+    const meio = eixo[Math.floor(eixo.length / 2)];
+    const pilares = lig.length === 2 || lig.length === 1 ? [0.24, -0.24].map((w) => [meio[0] - meio[3] * w, meio[1] + meio[2] * w]) : [[0.5, 0.5]];
+    pilares.sort((a, b) => a[0] + a[1] - b[0] - b[1]).forEach((p) => {
+      const top = S(p, 2), base = S(p, HZ + 1.5);
+      // espuma e reflexo na linha d'água
+      c.fillStyle = 'rgba(255,255,255,.55)'; c.beginPath(); c.ellipse(base[0], base[1] + 0.5, 5.2, 2.2, 0, 0, 7); c.fill();
+      const g = c.createLinearGradient(base[0] - 3, 0, base[0] + 3, 0);
+      g.addColorStop(0, '#c9c6bd'); g.addColorStop(0.5, '#a9a69e'); g.addColorStop(1, '#6f6d68');
+      c.fillStyle = g; c.fillRect(top[0] - 3, top[1], 6, base[1] - top[1]);
+      c.strokeStyle = 'rgba(30,30,40,.45)'; c.lineWidth = 0.6; c.strokeRect(top[0] - 3, top[1], 6, base[1] - top[1]);
+      c.fillStyle = '#8f8c85'; c.beginPath(); c.ellipse(base[0], base[1], 3, 1.4, 0, 0, Math.PI); c.fill();
+    });
+    // travessa (viga) sobre os pilares
+    if (pilares.length === 2) {
+      const a = S(pilares[0], 2.5), b = S(pilares[1], 2.5);
+      c.strokeStyle = '#7d7a73'; c.lineWidth = 3.4; c.lineCap = 'round';
+      c.beginPath(); c.moveTo(a[0], a[1]); c.lineTo(b[0], b[1]); c.stroke();
+    }
+  };
+  // tabuleiro: laje com espessura, calçadas, pista, faixas e guarda-corpos
+  M.tabuleiroPonte = function (c, x, y, sx, sy, lig) {
+    const m = M.mapa;
+    const S = (p, dy) => [sx + (p[0] - p[1]) * 32, sy + (p[0] + p[1]) * 16 + (dy || 0)];
+    const eixo = eixoPonte(x, y, lig);
+    if (eixo.length < 2) return;
+    const recorte = (sobe) => {
+      c.beginPath();
+      losangoPath(c, sx, sy, sobe);
+      lig.forEach((d) => losangoPath(c, sx + (DIR4[d][0] - DIR4[d][1]) * 32, sy + (DIR4[d][0] + DIR4[d][1]) * 16, sobe));
+      c.clip();
+    };
+    const linha = (pts, dy) => { c.beginPath(); pts.forEach((p, i) => { const q = S(p, dy); i ? c.lineTo(q[0], q[1]) : c.moveTo(q[0], q[1]); }); };
+    const laje = (w, dy, cor, contorno) => {
+      const e1 = bordaPonte(eixo, w, 1), e2 = bordaPonte(eixo, w, -1).reverse();
+      c.beginPath(); e1.concat(e2).forEach((p, i) => { const q = S(p, dy); i ? c.lineTo(q[0], q[1]) : c.moveTo(q[0], q[1]); }); c.closePath();
+      c.fillStyle = cor; c.fill();
+      if (contorno) { c.strokeStyle = contorno; c.lineWidth = 0.7; c.stroke(); }
+    };
+    c.save();
+    recorte(0);
+    c.lineJoin = 'round'; c.lineCap = 'butt';
+    // espessura da laje (face lateral de concreto) e topo com calçadas
+    laje(LARG_PONTE, 4, '#6b7078', 'rgba(25,28,36,.5)');
+    laje(LARG_PONTE, 0, '#d9d4c9');
+    // meio-fio entre calçada e pista
+    c.strokeStyle = '#f2efe8'; c.lineWidth = 16; linha(eixo); c.stroke();
+    c.strokeStyle = '#565c66'; c.lineWidth = 13.4; linha(eixo); c.stroke();
+    // juntas de dilatação nas bordas do tile
+    c.strokeStyle = 'rgba(30,32,38,.55)'; c.lineWidth = 0.9;
+    [eixo[0], eixo[eixo.length - 1]].forEach((q) => { const a = S([q[0] - q[3] * LARG_PONTE, q[1] + q[2] * LARG_PONTE]), b = S([q[0] + q[3] * LARG_PONTE, q[1] - q[2] * LARG_PONTE]); c.beginPath(); c.moveTo(a[0], a[1]); c.lineTo(b[0], b[1]); c.stroke(); });
+    // faixa central amarela tracejada
+    c.strokeStyle = 'rgba(255,214,90,.95)'; c.lineWidth = 1.1; c.setLineDash([4, 4]); c.lineDashOffset = ((x + y) & 1) * 4;
+    linha(eixo); c.stroke(); c.setLineDash([]);
+    c.restore();
+    // guarda-corpos: o do fundo primeiro, o da frente por último
+    c.save();
+    recorte(ALT_GUARDA + 4);
+    const lados = [1, -1].map((s2) => bordaPonte(eixo, LARG_GUARDA, s2));
+    lados.sort((a, b) => (a[0][0] + a[0][1] + a[a.length - 1][0] + a[a.length - 1][1]) - (b[0][0] + b[0][1] + b[b.length - 1][0] + b[b.length - 1][1]));
+    const pontaTerra = lig.map((d) => m.T(x + DIR4[d][0], y + DIR4[d][1]) !== T.PONTE);
+    lados.forEach((pts) => {
+      // mureta baixa de concreto
+      c.strokeStyle = '#b9b5ad'; c.lineWidth = 2.4; linha(pts, -1); c.stroke();
+      // montantes
+      c.strokeStyle = '#3e434b'; c.lineWidth = 1.6;
+      for (let i = 0; i < pts.length; i += 2) { const a = S(pts[i], -1), b = S(pts[i], -ALT_GUARDA); c.beginPath(); c.moveTo(a[0], a[1]); c.lineTo(b[0], b[1]); c.stroke(); }
+      c.strokeStyle = '#eef0f2'; c.lineWidth = 0.9;
+      for (let i = 0; i < pts.length; i += 2) { const a = S(pts[i], -1), b = S(pts[i], -ALT_GUARDA); c.beginPath(); c.moveTo(a[0], a[1]); c.lineTo(b[0], b[1]); c.stroke(); }
+      // corrimão (contorno escuro + tubo claro) e travessa intermediária
+      c.strokeStyle = '#3e434b'; c.lineWidth = 2.6; linha(pts, -ALT_GUARDA); c.stroke();
+      c.strokeStyle = '#f6f7f8'; c.lineWidth = 1.4; linha(pts, -ALT_GUARDA); c.stroke();
+      c.strokeStyle = 'rgba(210,214,220,.9)'; c.lineWidth = 0.8; linha(pts, -ALT_GUARDA * 0.5 - 0.5); c.stroke();
+      // cabeceiras: pilarete mais robusto onde a ponte encontra a estrada
+      [0, pts.length - 1].forEach((i, j) => {
+        if (!pontaTerra[j]) return;
+        const a = S(pts[i], 0);
+        c.fillStyle = '#c9c4ba'; c.fillRect(a[0] - 2.4, a[1] - ALT_GUARDA - 2.5, 4.8, ALT_GUARDA + 2.5);
+        c.strokeStyle = 'rgba(30,32,38,.55)'; c.lineWidth = 0.7; c.strokeRect(a[0] - 2.4, a[1] - ALT_GUARDA - 2.5, 4.8, ALT_GUARDA + 2.5);
+        c.fillStyle = '#e6e2da'; c.fillRect(a[0] - 2.4, a[1] - ALT_GUARDA - 2.5, 4.8, 1.4);
+      });
+    });
     c.restore();
   };
 

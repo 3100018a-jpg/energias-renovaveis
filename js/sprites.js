@@ -828,26 +828,104 @@
     c.strokeStyle = '#ccc'; c.beginPath(); c.arc(p[0] - 8, p[1] - 6, 6, -0.6, 1.2); c.stroke();
     placaIcone(c, 0.5, 0.85, 40, 'rede', '#6a4fd0');
   });
-  def('datacenter', [-70, -80, 70, 70], (c, r, v) => {
-    sombra(c, 1, 1, 64, 30, 0.3);
-    const k = { topo: '#3a4256', esq: '#2a3044', dir: '#1d2233' };
-    caixa(c, 0.1, 0.1, 1.9, 1.75, 0, 36, k);
-    // faixas de luz
-    for (let i = 0; i < 3; i++) {
-      const z = 8 + i * 9;
-      poly(c, [P(0.1, 1.75, z), P(1.9, 1.75, z), P(1.9, 1.75, z + 2), P(0.1, 1.75, z + 2)], i === 1 ? '#7a5bff' : '#3ad1ff', false);
-      poly(c, [P(1.9, 0.1, z), P(1.9, 1.75, z), P(1.9, 1.75, z + 2), P(1.9, 0.1, z + 2)], i === 1 ? '#5a3bdf' : '#2aa1df', false);
-      emissivo([P(0.1, 1.75, z), P(1.9, 1.75, z), P(1.9, 1.75, z + 2), P(0.1, 1.75, z + 2)], i === 1 ? '#a08bff' : '#7ae8ff');
-      emissivo([P(1.9, 0.1, z), P(1.9, 1.75, z), P(1.9, 1.75, z + 2), P(1.9, 0.1, z + 2)], i === 1 ? '#a08bff' : '#7ae8ff');
+  // data center: galpão de painéis metálicos, salão de servidores à vista, recepção de vidro,
+  // doca de carga, resfriadores com ventiladores e antena na cobertura.
+  // v: bit 1 = cobertura com painéis solares; bit 2 = cor de destaque alternativa
+  def('datacenter', [-70, -100, 70, 70], (c, r, v) => {
+    const solar = v % 2 === 1, alt = Math.floor(v / 2) % 2 === 1;
+    const acento = alt ? '#14a594' : '#6a4fd0', luz = alt ? '#7af0e0' : '#a08bff', luz2 = alt ? '#b8fff4' : '#7ae8ff';
+    const X0 = 0.12, Y0 = 0.12, X1 = 1.84, Y1 = 1.62, Z0 = 2, Z1 = 46;
+    sombra(c, 1, 1, 68, 32, 0.34);
+    // calçada de concreto ao redor
+    caixa(c, 0.03, 0.03, 1.97, 1.97, 0, 2, '#c3c7cc', { brilho: false });
+    c.strokeStyle = 'rgba(90,95,105,.25)'; c.lineWidth = 0.6;
+    for (let i = 1; i < 6; i++) { const a = P(0.03 + i * 0.32, 1.97, 2), b = P(0.03 + i * 0.32, Y1, 2); c.beginPath(); c.moveTo(a[0], a[1]); c.lineTo(b[0], b[1]); c.stroke(); }
+    // galpão principal
+    caixa(c, X0, Y0, X1, Y1, Z0, Z1, { topo: '#d9dee5', esq: '#eef1f5', dir: '#c6cdd6' });
+    // nervuras verticais dos painéis metálicos
+    c.strokeStyle = 'rgba(110,122,138,.32)'; c.lineWidth = 0.6;
+    for (let x = X0 + 0.08; x < X1; x += 0.08) { const a = P(x, Y1, Z0 + 1), b = P(x, Y1, Z1 - 1); c.beginPath(); c.moveTo(a[0], a[1]); c.lineTo(b[0], b[1]); c.stroke(); }
+    for (let y = Y0 + 0.08; y < Y1; y += 0.08) { const a = P(X1, y, Z0 + 1), b = P(X1, y, Z1 - 1); c.beginPath(); c.moveTo(a[0], a[1]); c.lineTo(b[0], b[1]); c.stroke(); }
+    // faixa de vidro escuro no alto, com friso de LED logo abaixo
+    const faixaE = (x0, x1, za, zb, cor) => poly(c, [P(x0, Y1, za), P(x1, Y1, za), P(x1, Y1, zb), P(x0, Y1, zb)], cor, false);
+    const faixaD = (y0, y1, za, zb, cor) => poly(c, [P(X1, y0, za), P(X1, y1, za), P(X1, y1, zb), P(X1, y0, zb)], cor, false);
+    faixaE(X0, X1, 33, 41, '#1f2a44'); faixaD(Y0, Y1, 33, 41, '#18223a');
+    c.strokeStyle = 'rgba(160,200,255,.35)'; c.lineWidth = 0.8;
+    for (let x = X0 + 0.2; x < X1; x += 0.2) { const a = P(x, Y1, 33), b = P(x, Y1, 41); c.beginPath(); c.moveTo(a[0], a[1]); c.lineTo(b[0], b[1]); c.stroke(); }
+    for (let y = Y0 + 0.2; y < Y1; y += 0.2) { const a = P(X1, y, 33), b = P(X1, y, 41); c.beginPath(); c.moveTo(a[0], a[1]); c.lineTo(b[0], b[1]); c.stroke(); }
+    faixaE(X0, X1, 30.5, 32, luz2); faixaD(Y0, Y1, 30.5, 32, luz);
+    emissivo([P(X0, Y1, 30.5), P(X1, Y1, 30.5), P(X1, Y1, 32), P(X0, Y1, 32)], luz2);
+    emissivo([P(X1, Y0, 30.5), P(X1, Y1, 30.5), P(X1, Y1, 32), P(X1, Y0, 32)], luz);
+    // salão de servidores visto pela vidraça: fileiras de racks com LEDs
+    const sx0 = 0.98, sx1 = 1.74, sz0 = 6, sz1 = 26;
+    const vid = [P(sx0, Y1, sz0), P(sx1, Y1, sz0), P(sx1, Y1, sz1), P(sx0, Y1, sz1)];
+    poly(c, vid, '#0d1424', 'rgba(220,230,240,.8)', 1);
+    const nR = 6;
+    for (let i = 0; i < nR; i++) {
+      const xa = sx0 + 0.03 + i * (sx1 - sx0 - 0.04) / nR, xb = xa + (sx1 - sx0 - 0.04) / nR - 0.025;
+      poly(c, [P(xa, Y1, sz0 + 1), P(xb, Y1, sz0 + 1), P(xb, Y1, sz1 - 2), P(xa, Y1, sz1 - 2)], '#1d2840', false);
+      // à noite, só as colunas de LEDs de cada rack brilham
+      const xm = (xa + xb) / 2;
+      emissivo([P(xm - 0.012, Y1, sz0 + 3), P(xm + 0.012, Y1, sz0 + 3), P(xm + 0.012, Y1, sz1 - 4), P(xm - 0.012, Y1, sz1 - 4)], i % 2 ? luz2 : '#58f08a');
+      for (let z = sz0 + 3; z < sz1 - 3; z += 2.6) {
+        for (let k = 0; k < 3; k++) {
+          const q = P(U.lerp(xa, xb, 0.2 + k * 0.3), Y1, z);
+          c.fillStyle = r() < 0.15 ? '#ffb347' : r() < 0.5 ? luz2 : '#58f08a';
+          c.fillRect(q[0] - 0.6, q[1] - 0.5, 1.3, 1);
+        }
+      }
     }
-    // resfriadores no telhado
-    for (let i = 0; i < 4; i++) for (let j = 0; j < 3; j++) {
-      const x = 0.25 + i * 0.4, y = 0.25 + j * 0.45;
-      caixa(c, x, y, x + 0.3, y + 0.3, 36, 42, '#9aa5b0', { brilho: false });
-      const p = P(x + 0.15, y + 0.15, 42); c.fillStyle = '#4a5566'; c.beginPath(); c.ellipse(p[0], p[1], 6, 3, 0, 0, 7); c.fill();
+    c.strokeStyle = 'rgba(255,255,255,.18)'; c.lineWidth = 1.2;
+    { const a = P(sx0 + 0.1, Y1, sz1 - 2), b = P(sx0 + 0.35, Y1, sz0 + 3); c.beginPath(); c.moveTo(a[0], a[1]); c.lineTo(b[0], b[1]); c.stroke(); }
+    // recepção de vidro com marquise e porta
+    caixa(c, 0.3, Y1, 0.82, Y1 + 0.2, Z0, 18, { topo: '#e6edf2', esq: '#a7d6ee', dir: '#86c0dc' }, { semAO: true });
+    poly(c, [P(0.48, Y1 + 0.2, Z0), P(0.64, Y1 + 0.2, Z0), P(0.64, Y1 + 0.2, 13), P(0.48, Y1 + 0.2, 13)], '#2b3c55', 'rgba(255,255,255,.8)', 0.8);
+    emissivo([P(0.3, Y1 + 0.2, 4), P(0.82, Y1 + 0.2, 4), P(0.82, Y1 + 0.2, 16), P(0.3, Y1 + 0.2, 16)], '#fff1c2');
+    caixa(c, 0.24, Y1 - 0.02, 0.88, Y1 + 0.3, 18, 20.5, '#f4f5f7');
+    placaIcone(c, 0.56, Y1 + 0.02, 30, 'servidor', acento);
+    // doca de carga na face direita: portões de enrolar e luminárias
+    [[0.3, 0.68], [0.82, 1.2]].forEach((d) => {
+      const q = [P(X1, d[0], Z0), P(X1, d[1], Z0), P(X1, d[1], 17), P(X1, d[0], 17)];
+      poly(c, q, '#8e97a2', 'rgba(40,45,55,.6)', 0.8);
+      c.strokeStyle = 'rgba(60,66,76,.45)'; c.lineWidth = 0.6;
+      for (let z = Z0 + 2; z < 17; z += 2) { const a = P(X1, d[0], z), b = P(X1, d[1], z); c.beginPath(); c.moveTo(a[0], a[1]); c.lineTo(b[0], b[1]); c.stroke(); }
+      const lp = P(X1, (d[0] + d[1]) / 2, 20); c.fillStyle = '#ffe9a8'; c.fillRect(lp[0] - 2, lp[1] - 1, 4, 2);
+      emissivo([[lp[0] - 2, lp[1] - 1], [lp[0] + 2, lp[1] - 1], [lp[0] + 2, lp[1] + 1], [lp[0] - 2, lp[1] + 1]], '#ffe9a8');
+    });
+    // venezianas de ventilação acima da doca
+    c.strokeStyle = 'rgba(70,78,90,.55)'; c.lineWidth = 0.7;
+    for (let z = 21; z < 29; z += 1.6) { const a = P(X1, 1.3, z), b = P(X1, 1.55, z); c.beginPath(); c.moveTo(a[0], a[1]); c.lineTo(b[0], b[1]); c.stroke(); }
+    // platibanda colorida no topo
+    caixa(c, X0, Y0, X1, Y1, Z1, Z1 + 3, acento, { semTopo: true, semAO: true });
+    // cobertura: resfriadores com dois ventiladores cada
+    const unidade = (x, y) => {
+      caixa(c, x, y, x + 0.3, y + 0.44, Z1, Z1 + 7, '#aab4bf', { brilho: false });
+      [0.12, 0.32].forEach((dy) => {
+        const q = P(x + 0.15, y + dy, Z1 + 7);
+        c.fillStyle = '#3a4452'; c.beginPath(); c.ellipse(q[0], q[1], 6.2, 3.1, 0, 0, 7); c.fill();
+        c.fillStyle = '#5c6878'; c.beginPath(); c.ellipse(q[0], q[1], 4.6, 2.3, 0, 0, 7); c.fill();
+        c.strokeStyle = '#2a323d'; c.lineWidth = 0.8;
+        c.beginPath(); c.moveTo(q[0] - 4.4, q[1]); c.lineTo(q[0] + 4.4, q[1]); c.moveTo(q[0], q[1] - 2.2); c.lineTo(q[0], q[1] + 2.2); c.stroke();
+        c.fillStyle = '#c8d0d8'; c.beginPath(); c.ellipse(q[0], q[1], 1.1, 0.6, 0, 0, 7); c.fill();
+      });
+    };
+    for (let i = 0; i < 4; i++) for (let j = 0; j < 2; j++) {
+      if (solar && j === 0) continue;
+      unidade(0.24 + i * 0.38, 0.26 + j * 0.6);
     }
-    if (v === 1) { painelSolar(c, 0.25, 0.25, 1.5, 0.5, 44, 4); }
-    placaIcone(c, 1.0, 1.75, 30, 'servidor', '#6a4fd0');
+    if (solar) for (let i = 0; i < 4; i++) painelSolar(c, 0.22 + i * 0.38, 0.24, 0.32, 0.42, Z1 + 1, 5);
+    // duto de ar ao longo da cobertura
+    caixa(c, 0.2, 1.38, 1.72, 1.5, Z1, Z1 + 4, '#c9d1d9', { brilho: false });
+    // antena com luz de sinalização
+    const ab = P(1.66, 0.22, Z1), at = P(1.66, 0.22, Z1 + 30);
+    c.strokeStyle = '#6a7380'; c.lineWidth = 1.6; c.beginPath(); c.moveTo(ab[0], ab[1]); c.lineTo(at[0], at[1]); c.stroke();
+    c.lineWidth = 0.7; for (let k = 1; k < 5; k++) { const a = P(1.66, 0.22, Z1 + k * 6); c.beginPath(); c.moveTo(a[0] - 3, a[1]); c.lineTo(a[0] + 3, a[1]); c.stroke(); }
+    c.fillStyle = '#ff4a3a'; c.beginPath(); c.arc(at[0], at[1], 1.8, 0, 7); c.fill();
+    emissivo([[at[0] - 2, at[1] - 2], [at[0] + 2, at[1] - 2], [at[0] + 2, at[1] + 2], [at[0] - 2, at[1] + 2]], '#ff6a5a');
+    // antena parabólica
+    const pp = P(1.62, 0.62, Z1 + 2);
+    c.strokeStyle = '#7a838f'; c.lineWidth = 1.2; c.beginPath(); c.moveTo(pp[0], pp[1]); c.lineTo(pp[0], pp[1] - 7); c.stroke();
+    c.fillStyle = '#f4f6f8'; c.beginPath(); c.ellipse(pp[0] - 1, pp[1] - 10, 6, 4.2, -0.5, 0, 7); c.fill(); c.strokeStyle = CONTORNO; c.lineWidth = 0.7; c.stroke();
   }, { ruido: true });
   def('geradorDiesel', [-34, -50, 34, 34], (c) => {
     sombra(c, 0.5, 0.5, 30, 14, 0.25);
@@ -1159,6 +1237,157 @@
     else if (look.chapeu === 'cocar') { ['#d23b2f', '#ffd23f', '#2fa05a', '#2f7ad2', '#ffd23f', '#2fa05a', '#d23b2f'].forEach((k2, i) => { c.fillStyle = k2; c.beginPath(); c.ellipse(-9 + i * 3, -38, 1.6, 6, (i - 3) * 0.2, 0, 7); c.fill(); }); c.fillStyle = '#8a5a2a'; c.fillRect(-9, -34, 18, 2); }
     c.restore();
   };
+
+  // ---------- usina de cana: máquinas, cargas e pátio ----------
+  const roda = (c, x, y, z, rr, cor) => {
+    const p = P(x, y, z);
+    c.fillStyle = '#1e1e1e'; c.beginPath(); c.ellipse(p[0], p[1], rr * 0.82, rr, -0.46, 0, 7); c.fill();
+    c.fillStyle = cor || '#f2c418'; c.beginPath(); c.ellipse(p[0], p[1], rr * 0.36, rr * 0.44, -0.46, 0, 7); c.fill();
+  };
+  const cargaCana = (c, r, x0, y0, x1, y1, z, n) => {
+    const cs = ['#c9b25a', '#b8a34a', '#8aa83a', '#d8c27a', '#6f8a2a', '#a58f42'];
+    for (let i = 0; i < n; i++) {
+      const x = r.range(x0, x1 - 0.12), y = r.range(y0, y1), zz = z + r.range(0, 5);
+      const a = P(x, y, zz), b = P(x + 0.12, y + r.range(-0.03, 0.03), zz + r.range(-1, 1));
+      c.strokeStyle = cs[i % cs.length]; c.lineWidth = 1.5; c.beginPath(); c.moveTo(a[0], a[1]); c.lineTo(b[0], b[1]); c.stroke();
+    }
+  };
+  // colhedora de cana: esteiras, divisores de linha, cabine e elevador que despeja no transbordo
+  def('colhedoraCana', [-46, -64, 46, 36], (c, r) => {
+    sombra(c, 0.5, 0.5, 36, 16, 0.34);
+    caixa(c, 0.08, 0.18, 0.86, 0.32, 0, 6, '#2c2c2c', { brilho: false });
+    caixa(c, 0.08, 0.68, 0.86, 0.82, 0, 6, '#2c2c2c', { brilho: false });
+    for (let i = 0; i < 5; i++) { const p = P(0.14 + i * 0.17, 0.82, 3); c.fillStyle = '#5a5a5a'; c.beginPath(); c.ellipse(p[0], p[1], 2, 2.4, -0.46, 0, 7); c.fill(); }
+    caixa(c, 0.1, 0.26, 0.82, 0.74, 6, 19, '#2fa04a');
+    poly(c, [P(0.1, 0.74, 10), P(0.82, 0.74, 10), P(0.82, 0.74, 12.5), P(0.1, 0.74, 12.5)], '#f2c418', false);
+    poly(c, [P(0.82, 0.26, 10), P(0.82, 0.74, 10), P(0.82, 0.74, 12.5), P(0.82, 0.26, 12.5)], '#d9ad0c', false);
+    // cortador de base e divisores de linha (pontas amarelas) na frente
+    caixa(c, 0.82, 0.32, 0.95, 0.68, 1.5, 8, '#3b3b3b', { brilho: false });
+    [0.3, 0.7].forEach((yy) => {
+      poly(c, [P(0.84, yy - 0.07, 4), P(1.06, yy, 2), P(0.84, yy + 0.07, 4), P(0.84, yy, 13)], '#f2c418');
+      c.strokeStyle = '#a07a00'; c.lineWidth = 0.7; for (let k = 1; k < 4; k++) { const a = P(0.84 + k * 0.05, yy - 0.05 + k * 0.012, 4 + 2.5 * (3 - k)), b = P(0.84 + k * 0.05, yy + 0.05 - k * 0.012, 3); c.beginPath(); c.moveTo(a[0], a[1]); c.lineTo(b[0], b[1]); c.stroke(); }
+    });
+    // cabine
+    caixa(c, 0.5, 0.34, 0.78, 0.66, 19, 33, { topo: '#e8eef2', esq: '#9fd4ee', dir: '#7cbedd' });
+    caixa(c, 0.47, 0.31, 0.81, 0.69, 33, 35.5, '#f4f4f4');
+    const g = P(0.64, 0.5, 37); c.fillStyle = '#ff9a1f'; c.beginPath(); c.arc(g[0], g[1], 2, 0, 7); c.fill();
+    emissivo([[g[0] - 2, g[1] - 2], [g[0] + 2, g[1] - 2], [g[0] + 2, g[1] + 2], [g[0] - 2, g[1] + 2]], '#ffb347');
+    // escapamento
+    const e = P(0.28, 0.32, 19); c.strokeStyle = '#444'; c.lineWidth = 2; c.beginPath(); c.moveTo(e[0], e[1]); c.lineTo(e[0], e[1] - 12); c.stroke();
+    // elevador: sai da traseira e se debruça sobre o transbordo (lado de trás)
+    const b0 = P(0.18, 0.4, 16), b1 = P(0.1, -0.42, 38), d0 = P(0.3, 0.4, 16), d1 = P(0.22, -0.42, 38);
+    poly(c, [b0, b1, d1, d0], '#2a8f40');
+    c.strokeStyle = '#f2c418'; c.lineWidth = 1; c.beginPath(); c.moveTo(b0[0], b0[1]); c.lineTo(b1[0], b1[1]); c.stroke();
+    // toletes de cana caindo
+    for (let i = 0; i < 7; i++) { const q = P(0.16 + r.range(-0.04, 0.04), -0.42 + r.range(-0.03, 0.05), 36 - i * 4); c.fillStyle = i % 2 ? '#c9b25a' : '#8aa83a'; c.fillRect(q[0] - 1.6, q[1], 3.2, 1.4); }
+  });
+  // trator com transbordo (caçamba cheia de cana picada)
+  def('transbordo', [-46, -48, 46, 36], (c, r) => {
+    sombra(c, 0.5, 0.5, 36, 15, 0.3);
+    roda(c, 0.2, 0.8, 5, 5); roda(c, 0.44, 0.8, 5, 5);
+    caixa(c, 0.04, 0.2, 0.62, 0.8, 6, 21, '#2f8f3f');
+    c.strokeStyle = 'rgba(0,0,0,.18)'; c.lineWidth = 0.7; for (let x = 0.12; x < 0.62; x += 0.1) { const a = P(x, 0.8, 7), b = P(x, 0.8, 20); c.beginPath(); c.moveTo(a[0], a[1]); c.lineTo(b[0], b[1]); c.stroke(); }
+    cargaCana(c, r, 0.07, 0.24, 0.6, 0.76, 21, 46);
+    // engate e trator
+    const a = P(0.62, 0.5, 6), b = P(0.7, 0.5, 6); c.strokeStyle = '#333'; c.lineWidth = 2; c.beginPath(); c.moveTo(a[0], a[1]); c.lineTo(b[0], b[1]); c.stroke();
+    caixa(c, 0.7, 0.36, 1.0, 0.64, 5, 15, '#2fa04a');
+    caixa(c, 0.68, 0.34, 0.84, 0.66, 15, 29, { topo: '#e8eef2', esq: '#9fd4ee', dir: '#7cbedd' });
+    caixa(c, 0.66, 0.32, 0.86, 0.68, 29, 31, '#f4f4f4');
+    roda(c, 0.76, 0.72, 8, 8.5); roda(c, 0.95, 0.68, 4.5, 4.8);
+    const e = P(0.94, 0.42, 15); c.strokeStyle = '#444'; c.lineWidth = 1.6; c.beginPath(); c.moveTo(e[0], e[1]); c.lineTo(e[0], e[1] - 9); c.stroke();
+  });
+  // caminhão canavieiro carregado (cavalo + carreta de cana inteira)
+  def('caminhaoCana', [-46, -46, 46, 36], (c, r, v) => {
+    sombra(c, 0.5, 0.5, 36, 14, 0.3);
+    const cab = ['#d23b2f', '#2f7ad2', '#f0f0f0'][v % 3];
+    [0.14, 0.32, 0.5].forEach((x) => roda(c, x, 0.76, 4.5, 4.6, '#bbb'));
+    caixa(c, 0.04, 0.26, 0.7, 0.74, 7, 9, '#3a3a3a', { brilho: false });
+    // carga: feixe compacto de cana inteira, com as pontas dos colmos à mostra
+    caixa(c, 0.06, 0.29, 0.68, 0.71, 9, 22, { topo: '#b9a650', esq: '#a8963f', dir: '#8f7f34' }, { brilho: false });
+    c.lineWidth = 0.8;
+    for (let z = 10.5; z < 22; z += 2.2) {
+      c.strokeStyle = z % 4 < 2 ? 'rgba(220,200,120,.7)' : 'rgba(110,130,40,.6)';
+      const a = P(0.06, 0.71, z), b = P(0.68, 0.71, z); c.beginPath(); c.moveTo(a[0], a[1]); c.lineTo(b[0], b[1]); c.stroke();
+    }
+    for (let i = 0; i < 26; i++) { const q = P(0.68, r.range(0.31, 0.69), r.range(10, 21)); c.fillStyle = i % 2 ? '#e0cf8a' : '#c9b25a'; c.beginPath(); c.ellipse(q[0], q[1], 1, 0.8, 0, 0, 7); c.fill(); }
+    cargaCana(c, r, 0.07, 0.31, 0.67, 0.69, 22, 34);
+    // fueiros (estacas laterais)
+    c.strokeStyle = '#3a3a3a'; c.lineWidth = 1.3;
+    for (let x = 0.08; x < 0.7; x += 0.15) { const a = P(x, 0.74, 9), b = P(x, 0.74, 23); c.beginPath(); c.moveTo(a[0], a[1]); c.lineTo(b[0], b[1]); c.stroke(); }
+    // cavalo mecânico
+    roda(c, 0.82, 0.74, 4.5, 4.6, '#bbb'); roda(c, 0.96, 0.72, 4.5, 4.6, '#bbb');
+    caixa(c, 0.72, 0.3, 1.0, 0.7, 5, 13, '#4a4a4a', { brilho: false });
+    caixa(c, 0.8, 0.3, 1.0, 0.7, 13, 27, cab);
+    poly(c, [P(1.0, 0.36, 18), P(1.0, 0.64, 18), P(1.0, 0.64, 25), P(1.0, 0.36, 25)], '#9fd4ee', 'rgba(255,255,255,.8)');
+    poly(c, [P(0.84, 0.7, 18), P(0.96, 0.7, 18), P(0.96, 0.7, 25), P(0.84, 0.7, 25)], '#8fc8e6', 'rgba(255,255,255,.8)');
+    const f = P(1.0, 0.4, 9), f2 = P(1.0, 0.6, 9); c.fillStyle = '#fff3b0'; c.fillRect(f[0] - 1, f[1] - 1, 2.4, 2); c.fillRect(f2[0] - 1, f2[1] - 1, 2.4, 2);
+  });
+  // pilha de cana no pátio da usina
+  def('pilhaCana', [-36, -34, 36, 34], (c, r) => {
+    sombra(c, 0.5, 0.5, 30, 13, 0.25);
+    const cs = ['#c9b25a', '#b8a34a', '#8aa83a', '#d8c27a', '#a58f42', '#e0cf8a'];
+    for (let i = 0; i < 240; i++) {
+      const u = r(), w = r();
+      const x = 0.12 + u * 0.72, y = 0.15 + w * 0.7;
+      const d = Math.hypot((x - 0.5) / 0.4, (y - 0.5) / 0.38);
+      if (d > 1) continue;
+      const z = (1 - d * d) * 20 + r.range(0, 1.5);
+      const a = P(x, y, z), b = P(x + 0.13, y + r.range(-0.05, 0.05), z + r.range(-1.5, 1.5));
+      c.strokeStyle = cs[i % cs.length]; c.lineWidth = 1.4; c.beginPath(); c.moveTo(a[0], a[1]); c.lineTo(b[0], b[1]); c.stroke();
+    }
+  });
+  // tanques de etanol com dique de contenção
+  def('tanquesEtanol', [-36, -66, 36, 34], (c) => {
+    sombra(c, 0.5, 0.5, 32, 14, 0.25);
+    caixa(c, 0.04, 0.04, 0.96, 0.96, 0, 2, '#b8b3a8', { brilho: false });
+    [[0.34, 0.32], [0.68, 0.66]].forEach((q) => {
+      cilindro(c, q[0], q[1], 11, 2, 36, '#eef1f3', { faixas: [[0.62, 0.74, '#2e9e4a']], topo: '#dfe4e8' });
+      const e = P(q[0] + 0.18, q[1] + 0.05, 2), e2 = P(q[0] + 0.18, q[1] + 0.05, 36);
+      c.strokeStyle = '#8a8f96'; c.lineWidth = 0.8; c.beginPath(); c.moveTo(e[0], e[1]); c.lineTo(e2[0], e2[1]); c.stroke();
+    });
+    const a = P(0.34, 0.32, 8), b = P(0.68, 0.66, 8); c.strokeStyle = '#7d848c'; c.lineWidth = 2; c.beginPath(); c.moveTo(a[0], a[1]); c.lineTo(b[0], b[1]); c.stroke();
+    placaIcone(c, 0.68, 0.9, 22, 'gota', '#2e9e4a');
+  });
+  // balança rodoviária com guarita e cancela
+  def('balancaCana', [-36, -44, 36, 34], (c) => {
+    caixa(c, 0.04, 0.28, 0.96, 0.72, 0, 2.5, '#9aa0a6', { brilho: false });
+    for (let i = 0; i < 9; i++) { const x0 = 0.04 + i * 0.1; poly(c, [P(x0, 0.72, 0), P(x0 + 0.05, 0.72, 0), P(x0 + 0.05, 0.72, 2.5), P(x0, 0.72, 2.5)], '#f2c418', false); }
+    c.strokeStyle = 'rgba(60,64,70,.5)'; c.lineWidth = 0.6;
+    for (let x = 0.2; x < 0.95; x += 0.2) { const a = P(x, 0.28, 2.5), b = P(x, 0.72, 2.5); c.beginPath(); c.moveTo(a[0], a[1]); c.lineTo(b[0], b[1]); c.stroke(); }
+    caixa(c, 0.12, 0.76, 0.42, 0.98, 0, 16, '#f2efe6');
+    poly(c, [P(0.42, 0.8, 7), P(0.42, 0.94, 7), P(0.42, 0.94, 13), P(0.42, 0.8, 13)], '#8fc8e6', 'rgba(255,255,255,.8)');
+    caixa(c, 0.09, 0.73, 0.45, 1.01, 16, 18, '#2e9e4a');
+    const pb = P(0.9, 0.78, 0), pt = P(0.9, 0.78, 9); c.strokeStyle = '#555'; c.lineWidth = 2; c.beginPath(); c.moveTo(pb[0], pb[1]); c.lineTo(pt[0], pt[1]); c.stroke();
+    const br = P(0.9, 0.22, 9);
+    c.lineWidth = 2.2; c.strokeStyle = '#fff'; c.beginPath(); c.moveTo(pt[0], pt[1]); c.lineTo(br[0], br[1]); c.stroke();
+    c.setLineDash([3, 3]); c.strokeStyle = '#d23b2f'; c.beginPath(); c.moveTo(pt[0], pt[1]); c.lineTo(br[0], br[1]); c.stroke(); c.setLineDash([]);
+  });
+  // guarita de segurança com cancela (entrada do campus de data centers)
+  def('guaritaDC', [-36, -46, 36, 34], (c) => {
+    sombra(c, 0.5, 0.5, 26, 12, 0.22);
+    caixa(c, 0.18, 0.2, 0.62, 0.62, 0, 18, '#eef1f5');
+    janelasE(c, 0.18, 0.62, 0.62, 6, 15, 1, 2, '#8fc8e6');
+    janelasD(c, 0.2, 0.62, 0.62, 6, 15, 1, 2, '#7cbedd');
+    caixa(c, 0.12, 0.14, 0.68, 0.68, 18, 21, '#6a4fd0');
+    const pb = P(0.78, 0.6, 0), pt = P(0.78, 0.6, 9); c.strokeStyle = '#444'; c.lineWidth = 2.2; c.beginPath(); c.moveTo(pb[0], pb[1]); c.lineTo(pt[0], pt[1]); c.stroke();
+    const br = P(0.78, 1.0, 9);
+    c.lineWidth = 2.2; c.strokeStyle = '#fff'; c.beginPath(); c.moveTo(pt[0], pt[1]); c.lineTo(br[0], br[1]); c.stroke();
+    c.setLineDash([3, 3]); c.strokeStyle = '#d23b2f'; c.beginPath(); c.moveTo(pt[0], pt[1]); c.lineTo(br[0], br[1]); c.stroke(); c.setLineDash([]);
+    const cam = P(0.62, 0.2, 20); c.fillStyle = '#2a2f38'; c.fillRect(cam[0], cam[1] - 2, 4, 2.4);
+  });
+  // estacionamento com vagas demarcadas e carros
+  def('vagasCarros', [-36, -24, 36, 34], (c, r, v) => {
+    caixa(c, 0.04, 0.04, 0.96, 0.96, 0, 1, '#5d636c', { brilho: false });
+    c.strokeStyle = 'rgba(255,255,255,.85)'; c.lineWidth = 0.8;
+    for (let i = 0; i <= 4; i++) { const x = 0.1 + i * 0.2; const a = P(x, 0.12, 1), b = P(x, 0.45, 1), a2 = P(x, 0.55, 1), b2 = P(x, 0.88, 1); c.beginPath(); c.moveTo(a[0], a[1]); c.lineTo(b[0], b[1]); c.moveTo(a2[0], a2[1]); c.lineTo(b2[0], b2[1]); c.stroke(); }
+    const cs = ['#e04a3a', '#2f7ad2', '#f0f0f0', '#30c0c0', '#f0c419', '#2fa05a', '#8a5bd0'];
+    [[0, 0], [2, 0], [3, 0], [1, 1], [3, 1]].forEach((q, k) => {
+      const x = 0.13 + q[0] * 0.2, y = q[1] ? 0.6 : 0.16;
+      const cor = cs[(k + v * 2) % cs.length];
+      caixa(c, x, y, x + 0.14, y + 0.26, 1, 5, cor, { semAO: true });
+      caixa(c, x + 0.02, y + 0.06, x + 0.12, y + 0.2, 5, 8, { topo: '#cfe6f3', esq: '#9fc7dd', dir: '#7ea9c2' }, { semAO: true, brilho: false });
+    });
+  });
   // ferramentas de pintura compartilhadas com js/obras.js
   SPR.h = { P, poly, caixa, cilindro, telhado, janelasE, janelasD, painelSolar, placaIcone, chamine, sombra, bolha, copa, tronco, casa, torreResfriamento, emissivo, def, VERDES, CONTORNO };
 })();

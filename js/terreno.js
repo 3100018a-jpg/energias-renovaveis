@@ -37,6 +37,7 @@
     ['GRAMA_SECA', '#cdb86a', '#9b6b43', 1, 0],
     ['NEVE', '#f4f6f8', '#b8bcc4', 1, 0],
     ['CINZA_VULC', '#5a524c', '#3e3833', 1, 0],
+    ['CANA_COLHIDA', '#bfa75a', '#9b6b43', 1, 0],
   ];
   T.props = [];
   LISTA.forEach((l, i) => {
@@ -104,10 +105,34 @@
         break;
       }
       case T.CANA: {
-        c.fillStyle = '#93b832'; c.fillRect(0, 0, 64, 32);
-        c.strokeStyle = '#6f9a22'; c.lineWidth = 1;
-        for (let i = -6; i < 12; i++) { c.beginPath(); c.moveTo(i * 6, 0); c.lineTo(i * 6 + 32, 32); c.stroke(); }
-        fios(50 * n, '#c4e04a', 5); fios(30 * n, '#5f8a1a', 4);
+        // chão do talhão: sulcos de plantio entre as linhas de cana (as plantas vêm de T.canavial)
+        c.fillStyle = '#6f8f2a'; c.fillRect(0, 0, 64, 32);
+        // sulcos paralelos às linhas de plantio (eixo x do tile)
+        for (let i = 0; i < 8; i++) {
+          const v0 = (i + 0.5) / 8;
+          c.strokeStyle = i % 2 ? 'rgba(110,80,40,.55)' : 'rgba(70,110,30,.6)'; c.lineWidth = 2.2;
+          c.beginPath(); c.moveTo(32 - v0 * 32, v0 * 16); c.lineTo(64 - v0 * 32, 16 + v0 * 16); c.stroke();
+        }
+        pinc(10 * n, ['#5f7f22', '#86a83a', '#7a6a3a'], 1, 3);
+        break;
+      }
+      case T.CANA_COLHIDA: {
+        // talhão recém-colhido: soqueira (tocos) e palha espalhada sobre o solo
+        c.fillStyle = '#a8904c'; c.fillRect(0, 0, 64, 32);
+        for (let i = 0; i < 8; i++) {
+          const v0 = (i + 0.5) / 8;
+          c.strokeStyle = i % 2 ? 'rgba(120,90,45,.5)' : 'rgba(225,205,130,.6)'; c.lineWidth = 2;
+          c.beginPath(); c.moveTo(32 - v0 * 32, v0 * 16); c.lineTo(64 - v0 * 32, 16 + v0 * 16); c.stroke();
+        }
+        // soqueira: tocos curtos das plantas cortadas, nas linhas de plantio
+        for (let li = 0; li < 4; li++) for (let k = 0; k < 6; k++) {
+          const u = 0.08 + k * 0.168, v0 = 0.125 + li * 0.25;
+          const px = (u - v0) * 32 + 32, py = (u + v0) * 16;
+          c.fillStyle = '#6f7a2a'; c.fillRect(px - 1.2, py - 2, 1, 2); c.fillRect(px + 0.4, py - 1.6, 1, 1.6);
+        }
+        c.strokeStyle = 'rgba(240,222,150,.8)'; c.lineWidth = 0.6;
+        for (let i = 0; i < 40 * n; i++) { const x = r() * 64, y = r() * 32, a = r() * 3.1; c.beginPath(); c.moveTo(x, y); c.lineTo(x + Math.cos(a) * 3, y + Math.sin(a) * 1.5); c.stroke(); }
+        for (let i = 0; i < 14 * n; i++) { c.fillStyle = r() < 0.5 ? '#7a8a2a' : '#6a5a2a'; c.fillRect(r() * 64, r() * 32, 1.2, 1.6); }
         break;
       }
       case T.AREIA:
@@ -171,6 +196,63 @@
     return cv;
   };
 
+  // ---------- plantas de cana-de-açúcar sobre o tile (64 × 58, base no losango) ----------
+  // Linhas de touceiras: colmos verticais com nós e folhas longas e arqueadas.
+  // A imagem é desenhada com o canto superior esquerdo em (sx - 33, sy - CANA_ALT).
+  T.CANA_ALT = 24;
+  const canas = {};
+  T.canavial = function (v, res) {
+    res = res || 1;
+    const k = v + ':' + res;
+    if (canas[k]) return canas[k];
+    const A = T.CANA_ALT, W = 66, H = 32 + A + 2;
+    const cv = document.createElement('canvas');
+    cv.width = Math.ceil(W * res); cv.height = Math.ceil(H * res);
+    const c = cv.getContext('2d');
+    c.scale(res, res); c.translate(33, A);
+    c.lineCap = 'round';
+    const r = U.rng(4517 + v * 131);
+    const P = (x, y) => [(x - y) * 32, (x + y) * 16];
+    const touceiras = [];
+    // 4 linhas de plantio ao longo do eixo x do tile
+    for (let li = 0; li < 4; li++) {
+      const y = 0.125 + li * 0.25;
+      for (let xi = 0; xi < 6; xi++) touceiras.push([0.08 + xi * 0.168 + r.range(-0.03, 0.03), y + r.range(-0.03, 0.03)]);
+    }
+    touceiras.sort((a, b) => a[0] + a[1] - b[0] - b[1]);
+    const verdes = ['#5f9a24', '#74b02c', '#8cc63a', '#4e8a1f', '#9ccf48'];
+    touceiras.forEach((t) => {
+      const b = P(t[0], t[1]);
+      const alt = r.range(15, 22);
+      // colmos
+      const nC = 3 + Math.floor(r() * 2);
+      for (let i = 0; i < nC; i++) {
+        const dx = r.range(-2.2, 2.2), topo = [b[0] + dx + r.range(-1.2, 1.2), b[1] - alt * r.range(0.75, 1)];
+        c.strokeStyle = r() < 0.5 ? '#9a9a3a' : '#b0a548'; c.lineWidth = 1.25;
+        c.beginPath(); c.moveTo(b[0] + dx * 0.5, b[1]); c.lineTo(topo[0], topo[1]); c.stroke();
+        // nós do colmo
+        c.strokeStyle = 'rgba(90,80,30,.55)'; c.lineWidth = 0.6;
+        for (let z = 3; z < alt * 0.7; z += 3.4) { const yy = b[1] - z, xx = U.lerp(b[0] + dx * 0.5, topo[0], z / alt); c.beginPath(); c.moveTo(xx - 0.8, yy); c.lineTo(xx + 0.8, yy); c.stroke(); }
+      }
+      // folhas longas e arqueadas, das de trás para as da frente
+      const nF = 6 + Math.floor(r() * 3);
+      for (let i = 0; i < nF; i++) {
+        const o = [b[0] + r.range(-1.5, 1.5), b[1] - alt * r.range(0.45, 0.95)];
+        const lado = r() < 0.5 ? -1 : 1, comp = r.range(7, 12);
+        const fim = [o[0] + lado * comp, o[1] + r.range(-1, 5)];
+        const ctl = [o[0] + lado * comp * 0.35, o[1] - r.range(4, 8)];
+        c.strokeStyle = verdes[(i + Math.floor(r() * 5)) % verdes.length]; c.lineWidth = r.range(1, 1.7);
+        c.beginPath(); c.moveTo(o[0], o[1]); c.quadraticCurveTo(ctl[0], ctl[1], fim[0], fim[1]); c.stroke();
+        if (r() < 0.35) { c.strokeStyle = 'rgba(220,210,120,.75)'; c.lineWidth = 0.8; c.beginPath(); c.moveTo(U.lerp(ctl[0], fim[0], 0.7), U.lerp(ctl[1], fim[1], 0.7)); c.lineTo(fim[0], fim[1]); c.stroke(); }
+      }
+      // brilho no alto da touceira
+      c.fillStyle = 'rgba(230,255,170,.35)';
+      c.beginPath(); c.ellipse(b[0] - 1, b[1] - alt * 0.85, 3, 1.4, 0, 0, 7); c.fill();
+    });
+    canas[k] = cv;
+    return cv;
+  };
+
   // ---------- gerador de mapas (coordenadas de imagem) ----------
   // Cada mapa é um losango N×N; a área jogável é o retângulo de tela que
   // corresponde à imagem (ix,iy ∈ [0,1]).
@@ -179,6 +261,7 @@
       N, seed,
       tipo: new Uint8Array(N * N).fill(T.MAR),
       alt: new Int8Array(N * N).fill(0),
+      aguaSob: new Uint8Array(N * N).fill(255), // água que passa sob cada ponte (255 = nenhuma)
       bloq: new Uint8Array(N * N),
       ents: [], fogo: [], marcos: [],
       ruido: U.noise2(seed),
@@ -188,7 +271,13 @@
     m.dentro = (x, y) => x >= 0 && y >= 0 && x < N && y < N;
     m.T = (x, y) => (m.dentro(x, y) ? m.tipo[y * N + x] : T.MAR_FUNDO);
     m.H = (x, y) => (m.dentro(x, y) ? m.alt[y * N + x] : 0);
-    m.set = (x, y, t, h) => { if (!m.dentro(x, y)) return; m.tipo[y * N + x] = t; if (h !== undefined) m.alt[y * N + x] = h; };
+    m.set = (x, y, t, h) => {
+      if (!m.dentro(x, y)) return;
+      const i = y * N + x;
+      // ao virar ponte, guarda o tipo de água de baixo (rio, rejeito, lago…)
+      if (t === T.PONTE && m.tipo[i] !== T.PONTE) m.aguaSob[i] = T.ehAgua(m.tipo[i]) ? m.tipo[i] : 255;
+      m.tipo[i] = t; if (h !== undefined) m.alt[i] = h;
+    };
     m.setH = (x, y, h) => { if (m.dentro(x, y)) m.alt[y * N + x] = h; };
     // imagem → tile
     m.tile = (ix, iy) => {
