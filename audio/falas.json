@@ -64,6 +64,14 @@
   "azure": "pt-BR-FranciscaNeural"
  },
  {
+  "id": "ad88966f",
+  "voz": "pt-BR-FranciscaNeural",
+  "rate": "+0%",
+  "pitch": "+0Hz",
+  "texto": "Arranjo limpo: Garagem de ônibus elétricos com telhado solar. Problema: os ônibus a diesel poluíam o ar do centro e faziam muito barulho. Solução: na garagem, a cobertura de painéis solares carrega os ônibus elétricos durante o dia, e um banco de baterias completa a recarga à noite. O ar fica mais limpo e o transporte, silencioso.",
+  "azure": "pt-BR-FranciscaNeural"
+ },
+ {
   "id": "db9f99c6",
   "voz": "pt-BR-FranciscaNeural",
   "rate": "+0%",
@@ -157,6 +165,14 @@
   "rate": "+0%",
   "pitch": "+0Hz",
   "texto": "O caminho da luz. As células fotovoltaicas, feitas principalmente de silício, transformam a luz do Sol em corrente elétrica. Um inversor converte essa corrente para uso nas tomadas.",
+  "azure": "pt-BR-ThalitaNeural"
+ },
+ {
+  "id": "76284175",
+  "voz": "pt-BR-FranciscaNeural",
+  "rate": "+0%",
+  "pitch": "+0Hz",
+  "texto": "Arranjo limpo: Estacionamento solar com eletroposto e baterias. Problema: muitos carros elétricos recarregando ao mesmo tempo, no fim da tarde, sobrecarregavam a rede do bairro. Solução: as coberturas solares produzem energia e fazem sombra. As baterias guardam a sobra do meio-dia e liberam essa energia no horário de pico, aliviando os transformadores.",
   "azure": "pt-BR-ThalitaNeural"
  },
  {
@@ -1568,6 +1584,14 @@
   "azure": "pt-BR-AntonioNeural"
  },
  {
+  "id": "b572229e",
+  "voz": "pt-BR-AntonioNeural",
+  "rate": "+0%",
+  "pitch": "+0Hz",
+  "texto": "Arranjo limpo: Dessalinizadora movida a vento e sol. Problema: na vila do litoral semiárido falta água potável na estiagem, e a água do poço é salobra. Solução: um aerogerador de pequeno porte e painéis solares alimentam as bombas da dessalinização por osmose reversa. A água potável fica no reservatório, e a salmoura volta diluída ao mar.",
+  "azure": "pt-BR-AntonioNeural"
+ },
+ {
   "id": "982889d2",
   "voz": "pt-BR-AntonioNeural",
   "rate": "+0%",
@@ -2856,6 +2880,14 @@
   "azure": "pt-BR-ElzaNeural"
  },
  {
+  "id": "6506b03e",
+  "voz": "pt-BR-FranciscaNeural",
+  "rate": "-5%",
+  "pitch": "+0Hz",
+  "texto": "Arranjo limpo: Irrigação com bombeamento solar. Problema: os agricultores usavam bombas a diesel e tiravam água demais do rio na seca. Solução: painéis solares acionam a bomba durante o dia e enchem uma caixa-d'água elevada, que funciona como uma bateria de água. Ela desce por gravidade para o gotejamento, que gasta bem menos água.",
+  "azure": "pt-BR-ElzaNeural"
+ },
+ {
   "id": "c436043b",
   "voz": "pt-BR-FranciscaNeural",
   "rate": "-5%",
@@ -3952,6 +3984,14 @@
   "azure": "pt-BR-GiovannaNeural"
  },
  {
+  "id": "ce86f751",
+  "voz": "pt-BR-FranciscaNeural",
+  "rate": "+0%",
+  "pitch": "+0Hz",
+  "texto": "Arranjo limpo: Fábrica de gelo solar para a pesca. Problema: sem gelo barato, parte do pescado estragava antes de chegar ao mercado, e o gerador a diesel custava caro. Solução: os painéis no telhado fazem gelo durante o dia, e o próprio gelo guarda o frio para a noite, como uma bateria térmica. Os pescadores conservam o peixe e gastam menos com combustível.",
+  "azure": "pt-BR-GiovannaNeural"
+ },
+ {
   "id": "7b56e86b",
   "voz": "pt-BR-FranciscaNeural",
   "rate": "+0%",
@@ -4920,6 +4960,14 @@
   "azure": "pt-BR-HumbertoNeural"
  },
  {
+  "id": "820247c4",
+  "voz": "pt-BR-AntonioNeural",
+  "rate": "+0%",
+  "pitch": "+0Hz",
+  "texto": "Arranjo limpo: Central de calor geotérmico em cascata. Problema: casas e estufas da vila queimavam lenha e gás para se aquecer. Solução: a água quente do poço passa por um trocador de calor e é usada em cascata: primeiro aquece as casas, depois a estufa e, já morna, os tanques de peixes. No fim, volta ao subsolo pelo poço de reinjeção, para o reservatório não se esgotar.",
+  "azure": "pt-BR-HumbertoNeural"
+ },
+ {
   "id": "d13d1880",
   "voz": "pt-BR-AntonioNeural",
   "rate": "+0%",
@@ -5824,6 +5872,14 @@
   "azure": "pt-BR-ValerioNeural"
  },
  {
+  "id": "f34d20c0",
+  "voz": "pt-BR-AntonioNeural",
+  "rate": "-5%",
+  "pitch": "+0Hz",
+  "texto": "Arranjo limpo: Biometano da vinhaça abastecendo a frota. Problema: a vinhaça sem tratamento polui rios, e os caminhões canavieiros queimam muito diesel. Solução: biodigestores transformam a vinhaça em biogás. Depois de purificado, ele vira biometano e abastece caminhões e tratores no posto da usina. O que sobra da digestão volta ao canavial como adubo.",
+  "azure": "pt-BR-ValerioNeural"
+ },
+ {
   "id": "21dbbb04",
   "voz": "pt-BR-AntonioNeural",
   "rate": "-5%",
@@ -6629,6 +6685,14 @@
   "rate": "+0%",
   "pitch": "+0Hz",
   "texto": "Metano. O metano liberado pelo lixo orgânico aquece a atmosfera muito mais que o gás carbônico, em curto prazo. Queimá-lo para gerar energia reduz esse impacto.",
+  "azure": "pt-BR-LeilaNeural"
+ },
+ {
+  "id": "094a8115",
+  "voz": "pt-BR-FranciscaNeural",
+  "rate": "+0%",
+  "pitch": "+0Hz",
+  "texto": "Arranjo limpo: Aterro sanitário que gera energia. Problema: o lixo em decomposição solta metano, um gás que aquece o planeta muito mais que o gás carbônico. Solução: drenos captam o biogás do aterro e o levam a motogeradores que produzem eletricidade; a sobra é queimada no queimador. Sobre as células já encerradas, cobertas de terra e grama, foram instalados painéis solares.",
   "azure": "pt-BR-LeilaNeural"
  },
  {
@@ -7504,6 +7568,14 @@
   "azure": "pt-BR-YaraNeural"
  },
  {
+  "id": "0f8a1fb3",
+  "voz": "pt-BR-FranciscaNeural",
+  "rate": "+0%",
+  "pitch": "+0Hz",
+  "texto": "Arranjo limpo: Comunidade ribeirinha com sol e baterias. Problema: a comunidade dependia de diesel trazido de barco por dias de viagem, caro e poluente. Solução: painéis solares nas palafitas e um banco de baterias formam uma pequena rede isolada, chamada microrrede. A energia limpa liga o freezer da cooperativa, o purificador de água e o barco elétrico da escola.",
+  "azure": "pt-BR-YaraNeural"
+ },
+ {
   "id": "8d897404",
   "voz": "pt-BR-FranciscaNeural",
   "rate": "+0%",
@@ -8301,6 +8373,14 @@
   "rate": "+0%",
   "pitch": "+0Hz",
   "texto": "Mariana e Brumadinho. Os rompimentos de barragens em Mariana, em 2015, e Brumadinho, em 2019, mataram centenas de pessoas e devastaram rios. Desde então, barragens do tipo a montante devem ser desativadas.",
+  "azure": "pt-BR-ManuelaNeural"
+ },
+ {
+  "id": "c9716405",
+  "voz": "pt-BR-FranciscaNeural",
+  "rate": "+0%",
+  "pitch": "+0Hz",
+  "texto": "Arranjo limpo: Mina com correia transportadora e caminhões elétricos. Problema: caminhões a diesel subiam a rampa da cava o dia inteiro, queimando combustível e levantando poeira. Solução: uma correia transportadora movida pela usina solar leva o minério até o beneficiamento. Os caminhões elétricos recarregam na estação ao lado e recuperam parte da energia ao frear nas descidas.",
   "azure": "pt-BR-ManuelaNeural"
  },
  {
@@ -9208,6 +9288,14 @@
   "azure": "pt-BR-JulioNeural"
  },
  {
+  "id": "bf121cca",
+  "voz": "pt-BR-AntonioNeural",
+  "rate": "+0%",
+  "pitch": "+0Hz",
+  "texto": "Arranjo limpo: Resfriamento com água de reúso e sol flutuante. Problema: o data center usava muita água potável para resfriar os servidores e disputava essa água com a cidade na estiagem. Solução: uma estação trata o esgoto e fornece água de reúso para o resfriamento. Sobre a lagoa de água tratada, painéis solares flutuantes geram energia e diminuem a evaporação.",
+  "azure": "pt-BR-JulioNeural"
+ },
+ {
   "id": "133dd2dd",
   "voz": "pt-BR-AntonioNeural",
   "rate": "+0%",
@@ -10021,6 +10109,14 @@
   "rate": "+0%",
   "pitch": "+0Hz",
   "texto": "A curva do consumo. O consumo de energia cresce no fim da tarde e no começo da noite, quando o Sol já se pôs. Armazenar a energia solar do meio-dia é um dos maiores desafios da transição energética.",
+  "azure": "pt-BR-BrendaNeural"
+ },
+ {
+  "id": "9c819374",
+  "voz": "pt-BR-FranciscaNeural",
+  "rate": "+0%",
+  "pitch": "+0Hz",
+  "texto": "Arranjo limpo: Usina virtual de baterias do bairro. Problema: no fim da tarde, quando o sol se põe e todos chegam em casa, o consumo dispara e a rede precisava ligar termelétricas. Solução: baterias de bairro, carros elétricos e casas com painéis são coordenados por um programa, como se fossem uma única usina. Eles guardam a energia solar do dia e a devolvem no pico da noite.",
   "azure": "pt-BR-BrendaNeural"
  },
  {
