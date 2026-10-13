@@ -100,7 +100,7 @@ h3 { font-size: 1.08rem; line-height: 1.25; color: var(--suave); }
   <div id="obras"></div>
 
   <section class="missao" id="vozes-personagens">
-    <header><h2>Vozes dos personagens</h2><span>Primeira fala de cada morador e narrador, com a voz neural pt-BR definida para ele</span></header>
+    <header><h2>Vozes dos personagens</h2><span>Primeira fala de cada morador e narrador, com a voz neural pt-BR usada na gravação</span></header>
     <div class="vozes" id="vozes"></div>
   </section>
 </main>
@@ -145,7 +145,7 @@ h3 { font-size: 1.08rem; line-height: 1.25; color: var(--suave); }
   ERS.MISSOES.forEach((ms) => {
     const sec = document.createElement('section');
     sec.className = 'missao'; sec.id = 'm-' + ms.id;
-    sec.innerHTML = `<header><h2>${esc(ms.nome)}</h2><span>${esc(ms.fonte)} · narração de ${esc(ms.narrador.nome)} (${esc(nomeVoz(ERS.VOZES[ms.narrador.voz]))})</span></header>`;
+    sec.innerHTML = `<header><h2>${esc(ms.nome)}</h2><span>${esc(ms.fonte)} · narração de ${esc(ms.narrador.nome)}</span></header>`;
     ir.insertAdjacentHTML('beforeend', `<option value="m-${ms.id}">${esc(ms.nome)}</option>`);
     ms.lotes.forEach((l) => {
       lotes++;
@@ -204,7 +204,7 @@ h3 { font-size: 1.08rem; line-height: 1.25; color: var(--suave); }
     const p = ERS.VOZES[chave]; const id = idFala(texto, chave);
     const faixa = { idoso: 'mais velho(a)', adulto: 'adulto(a)', jovem: 'jovem' }[p.faixa] || 'narração';
     return `<div class="voz"><span class="quem">${esc(onde)}</span><strong>${esc(nome)} <small>· ${esc(papel)}</small></strong>` +
-      `<small>Voz ${esc(nomeVoz(p))} · ${faixa}</small><p><q>${esc(texto)}</q></p>${botaoOuvir(id)}</div>`;
+      `<small data-voz-de="${id}">${p.genero === 'M' ? 'Masculino' : 'Feminino'} · ${faixa}</small><p><q>${esc(texto)}</q></p>${botaoOuvir(id)}</div>`;
   }
   let html = cartaoVoz(ERS.HUB.narrador.nome, ERS.HUB.narrador.papel, ERS.HUB.narrador.voz, ERS.HUB.intro[0], ERS.HUB.nome);
   ERS.MISSOES.forEach((m) => {
@@ -212,6 +212,10 @@ h3 { font-size: 1.08rem; line-height: 1.25; color: var(--suave); }
     m.npcs.forEach((n) => { html += cartaoVoz(n.nome, n.papel, n.voz, n.fala, m.nome); });
   });
   vozes.innerHTML = html;
+  // voz realmente usada em cada gravação (no site publicado)
+  fetch('audio/vozes/motores.json').then((r) => (r.ok ? r.json() : {})).catch(() => ({})).then((m) => {
+    document.querySelectorAll('[data-voz-de]').forEach((el) => { const v = m[el.dataset.vozDe]; if (v) el.textContent += ' · voz ' + v.replace('pt-BR-', '').replace('Neural', ''); });
+  });
 
   // ---------- interação ----------
   let tocando = null;

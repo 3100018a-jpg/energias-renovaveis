@@ -38,31 +38,22 @@ Funciona direto no navegador, sem instalação, e foi preparado para ser publica
 
 ## Vozes em português do Brasil
 
-Todas as falas, perguntas e alternativas são lidas pelos personagens, sempre em português do Brasil, sem vozes multilíngues ou estrangeiras e sem distorção artificial de tom ou timbre.
+Todas as falas, perguntas e alternativas são lidas pelos personagens com vozes neurais da Microsoft em português do Brasil, gravadas pelo fluxo automático do GitHub com o serviço gratuito de leitura em voz alta (biblioteca edge-tts), sem necessidade de chave ou cadastro.
 
-1. **Vozes humanas do Azure AI Speech.** O fluxo automático grava todas as falas com as 16 vozes neurais monolíngues do português do Brasil: Francisca, Thalita, Brenda, Elza, Giovanna, Leila, Leticia, Manuela e Yara (femininas); Antonio, Donato, Fabio, Humberto, Julio, Nicolau e Valerio (masculinas). Os 12 narradores têm vozes diferentes entre si, e em cada missão o narrador e os seis moradores falam com sete vozes diferentes, sempre do mesmo gênero do personagem. Não há ajuste artificial de tom ou de timbre; só o ritmo acompanha a idade. O jogo inteiro usa cerca de 100 mil caracteres; o nível gratuito (F0) cobre 500 mil por mês.
-2. **Sem a chave do Azure, nenhuma voz é gravada.** O jogo mostra as falas em texto e só usa vozes do navegador que sejam neurais e naturais (como as vozes "Online (Natural)" do Microsoft Edge). Vozes robóticas antigas nunca são usadas.
-3. **Gravações conferidas.** O gerador recusa e grava de novo qualquer áudio incompleto (por exemplo, uma fala cortada na primeira palavra), e o jogo baixa as próximas falas antes, para começar sem espera.
+- Só são usadas vozes pt-BR monolíngues. Vozes multilíngues e de outros países são descartadas.
+- Não há ajuste artificial de tom nem de timbre. Só o ritmo acompanha a idade do personagem.
+- Cada personagem tem uma voz própria definida no jogo (`js/dados.js`). Quando o serviço gratuito oferece essa voz, ela é usada; quando não, o personagem fala com a voz do mesmo gênero. Hoje o serviço gratuito oferece Francisca (personagens femininas) e Antonio (masculinos). Se novas vozes pt-BR aparecerem, as falas desses personagens são regravadas sozinhas na próxima publicação.
+- O gerador confere cada gravação e refaz qualquer áudio incompleto. O jogo baixa as próximas falas antes, para começar sem espera.
+- Se ainda não houver gravação, o jogo só usa vozes do navegador que sejam neurais e naturais; se não houver nenhuma, mostra a fala em texto.
 
-Depois da publicação, a página **`amostras.html`** mostra todas as construções de cada lote e todas as soluções dos problemas, com desenho, ícone, efeitos e a fala do narrador, e as vozes de todos os personagens. A página **`amostras-vozes.html`** (por exemplo, `https://seu-usuario.github.io/energias-renovaveis/amostras-vozes.html`) mostra a primeira fala de cada personagem, com o nome da voz e se ela já está na versão definitiva.
-
-### Como ativar as vozes humanas do Azure
-
-1. Crie uma conta gratuita em [azure.microsoft.com/free](https://azure.microsoft.com/free) (o cadastro pode pedir um cartão para verificação; o nível F0 não cobra).
-2. No [portal do Azure](https://portal.azure.com), crie um recurso **Speech** (Serviços de Fala). Em **Pricing tier**, escolha **Free F0**. Em **Region**, escolha, por exemplo, **Brazil South**.
-3. Abra o recurso criado e vá em **Keys and Endpoint**. Copie a **KEY 1** e o nome da **Location/Region** (por exemplo, `brazilsouth`).
-4. No GitHub, abra o repositório e vá em **Settings → Secrets and variables → Actions → New repository secret**. Crie dois segredos:
-   - `AZURE_SPEECH_KEY` com a chave copiada;
-   - `AZURE_SPEECH_REGION` com a região (por exemplo, `brazilsouth`).
-5. Abra a aba **Actions**, escolha **Publicar jogo** e clique em **Run workflow**. O nível gratuito aceita 20 pedidos por minuto, então a primeira gravação leva cerca de uma hora. As seguintes só gravam falas novas ou alteradas.
-
-A chave fica guardada como segredo do GitHub e não aparece no site nem nos arquivos do jogo.
+Depois da publicação, a página **`amostras.html`** mostra todas as construções e soluções, com desenho, ícone, efeitos e fala do narrador, e as vozes de todos os personagens. A página **`amostras-vozes.html`** mostra a primeira fala de cada personagem e a voz usada.
 
 Para gerar as vozes no seu próprio computador:
 
 ```bash
+pip install edge-tts
 node tools/exportar_falas.js
-AZURE_SPEECH_KEY=sua-chave AZURE_SPEECH_REGION=brazilsouth python tools/gerar_vozes.py
+python tools/gerar_vozes.py
 ```
 
 ## Como publicar no GitHub Pages
@@ -70,7 +61,7 @@ AZURE_SPEECH_KEY=sua-chave AZURE_SPEECH_REGION=brazilsouth python tools/gerar_vo
 1. Crie um repositório no GitHub (por exemplo, `energias-renovaveis`).
 2. Envie todos os arquivos desta pasta para o ramo `main` (pelo site, em **Add file → Upload files**, ou com `git push`).
 3. No repositório, abra **Settings → Pages** e, em **Build and deployment → Source**, escolha **GitHub Actions**.
-4. Abra a aba **Actions**. O fluxo "Publicar jogo" roda sozinho: gera as vozes, guarda os MP3 no repositório e publica o site. A primeira execução com o Azure leva cerca de uma hora e meia por causa das vozes; as seguintes são rápidas. Para as vozes humanas dos moradores, configure antes o Azure (veja acima).
+4. Abra a aba **Actions**. O fluxo "Publicar jogo" roda sozinho: gera as vozes, guarda os MP3 no repositório e publica o site. A primeira execução leva cerca de 15 minutos por causa das vozes; as seguintes são rápidas.
 5. O endereço do jogo aparece em **Settings → Pages**, no formato `https://seu-usuario.github.io/energias-renovaveis/`.
 
 Se preferir não usar o fluxo automático, escolha em **Settings → Pages** a opção **Deploy from a branch** (ramo `main`, pasta `/`). O jogo funciona da mesma forma, usando as vozes do navegador.
