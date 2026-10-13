@@ -24,8 +24,11 @@ Funciona direto no navegador, sem instalação, e foi preparado para ser publica
   | Rede Inteligente (final) | Interconexão das fontes, armazenamento, fim do carvão e da nuclear | Clara Rocha, operadora do sistema |
 
 - **100 desafios** de múltipla escolha. As alternativas são embaralhadas a cada jogada e têm tamanhos parecidos, para que a resposta certa não se destaque pelo comprimento. Cada desafio traz uma explicação.
-- **Mais de 60 construções e ações** com efeitos sobre energia limpa, emissões, água, biodiversidade e bem-estar social. Há opções poluentes e opções limpas no lugar errado (por exemplo, uma usina solar derrubando a mata), para discutir planejamento territorial.
-- **Problemas ambientais** a resolver: termelétricas a carvão e a óleo, gerador a diesel, vazamento de petróleo, lixão, queimadas, barragem de rejeitos, usina nuclear. Algumas só podem ser desligadas quando já existe energia limpa suficiente.
+- **164 possibilidades de construção e de solução**, cada uma com desenho próprio no mapa e ícone próprio (um medalhão com o símbolo principal e outro menor no canto, verde, amarelo ou vermelho conforme o impacto), além de efeitos sobre energia limpa, emissões, água, biodiversidade e bem-estar social. Há opções poluentes e opções limpas no lugar errado (por exemplo, uma usina solar derrubando a mata), para discutir planejamento territorial.
+- **Arranjos híbridos** em todas as missões: usinas que combinam energias limpas, como sol e vento, sol e baterias, vento e hidrogênio verde, geotermia e sol, bagaço, biogás e sol. Na missão final, cada parte do arranjo entra no painel das 24 horas.
+- **Seis moradores por missão**, cada um com desafio, aparência e voz próprios, além de casas, sítios e comércios espalhados pelos mapas.
+- **Estradas contínuas e suaves**, com acostamento, faixas e cruzamentos; os veículos seguem as curvas na mão direita.
+- **Problemas ambientais** a resolver: termelétricas a carvão e a óleo, gerador a diesel, vazamento de petróleo, lixão, queimadas, barragem de rejeitos, usina nuclear. Cada problema tem três soluções, com custos, requisitos e efeitos diferentes; algumas são parciais e pedem atenção. Algumas só podem ser aplicadas quando já existe energia limpa suficiente.
 - **Missão final com painel das 24 horas**: mostra, hora a hora, se sol, vento, marés, biogás, hidrelétricas e armazenamento atendem o consumo da cidade.
 - **Insígnias, estrelas, pontos, conquistas especiais e certificado final** com o nome do estudante.
 - **Dia, entardecer, noite e ciclo automático**, escolhidos no mapa central, no cartão de cada missão ou no botão do topo da tela. À noite, janelas, postes, faróis dos carros, o farol da costa, o fogo e a lava se acendem.
@@ -35,17 +38,31 @@ Funciona direto no navegador, sem instalação, e foi preparado para ser publica
 
 ## Vozes em português do Brasil
 
-Todas as falas, perguntas e alternativas são lidas pelos personagens. O jogo usa dois caminhos, sempre em português do Brasil:
+Todas as falas, perguntas e alternativas são lidas pelos personagens, sempre em português do Brasil, sem vozes multilíngues ou estrangeiras e sem distorção artificial de tom ou timbre.
 
-1. **Vozes neurais gravadas (recomendado).** Ao publicar pelo GitHub, o fluxo automático em `.github/workflows/pages.yml` gera cerca de 1.050 arquivos MP3 com as vozes neurais pt-BR **Francisca**, **Antonio** e **Thalita**, cada personagem com seu ritmo e tom. Vozes multilíngues ou de outros idiomas não são usadas. Os arquivos ficam em `audio/vozes/` e o jogo passa a usá-los automaticamente.
-2. **Vozes do navegador (alternativa).** Enquanto os MP3 não existem, o jogo usa somente vozes pt-BR instaladas no navegador e escolhe as mais naturais (no Microsoft Edge, as vozes "Online (Natural)"; no Chrome, "Google português do Brasil"). Se o navegador não tiver nenhuma voz pt-BR, as falas aparecem só em texto, para não usar uma voz estrangeira.
+1. **Vozes humanas do Azure AI Speech.** O fluxo automático grava todas as falas com as 16 vozes neurais monolíngues do português do Brasil: Francisca, Thalita, Brenda, Elza, Giovanna, Leila, Leticia, Manuela e Yara (femininas); Antonio, Donato, Fabio, Humberto, Julio, Nicolau e Valerio (masculinas). Os 12 narradores têm vozes diferentes entre si, e em cada missão o narrador e os seis moradores falam com sete vozes diferentes, sempre do mesmo gênero do personagem. Não há ajuste artificial de tom ou de timbre; só o ritmo acompanha a idade. O jogo inteiro usa cerca de 100 mil caracteres; o nível gratuito (F0) cobre 500 mil por mês.
+2. **Sem a chave do Azure, nenhuma voz é gravada.** O jogo mostra as falas em texto e só usa vozes do navegador que sejam neurais e naturais (como as vozes "Online (Natural)" do Microsoft Edge). Vozes robóticas antigas nunca são usadas.
+3. **Gravações conferidas.** O gerador recusa e grava de novo qualquer áudio incompleto (por exemplo, uma fala cortada na primeira palavra), e o jogo baixa as próximas falas antes, para começar sem espera.
+
+Depois da publicação, a página **`amostras.html`** mostra todas as construções de cada lote e todas as soluções dos problemas, com desenho, ícone, efeitos e a fala do narrador, e as vozes de todos os personagens. A página **`amostras-vozes.html`** (por exemplo, `https://seu-usuario.github.io/energias-renovaveis/amostras-vozes.html`) mostra a primeira fala de cada personagem, com o nome da voz e se ela já está na versão definitiva.
+
+### Como ativar as vozes humanas do Azure
+
+1. Crie uma conta gratuita em [azure.microsoft.com/free](https://azure.microsoft.com/free) (o cadastro pode pedir um cartão para verificação; o nível F0 não cobra).
+2. No [portal do Azure](https://portal.azure.com), crie um recurso **Speech** (Serviços de Fala). Em **Pricing tier**, escolha **Free F0**. Em **Region**, escolha, por exemplo, **Brazil South**.
+3. Abra o recurso criado e vá em **Keys and Endpoint**. Copie a **KEY 1** e o nome da **Location/Region** (por exemplo, `brazilsouth`).
+4. No GitHub, abra o repositório e vá em **Settings → Secrets and variables → Actions → New repository secret**. Crie dois segredos:
+   - `AZURE_SPEECH_KEY` com a chave copiada;
+   - `AZURE_SPEECH_REGION` com a região (por exemplo, `brazilsouth`).
+5. Abra a aba **Actions**, escolha **Publicar jogo** e clique em **Run workflow**. O nível gratuito aceita 20 pedidos por minuto, então a primeira gravação leva cerca de uma hora. As seguintes só gravam falas novas ou alteradas.
+
+A chave fica guardada como segredo do GitHub e não aparece no site nem nos arquivos do jogo.
 
 Para gerar as vozes no seu próprio computador:
 
 ```bash
-pip install edge-tts
 node tools/exportar_falas.js
-python tools/gerar_vozes.py
+AZURE_SPEECH_KEY=sua-chave AZURE_SPEECH_REGION=brazilsouth python tools/gerar_vozes.py
 ```
 
 ## Como publicar no GitHub Pages
@@ -53,7 +70,7 @@ python tools/gerar_vozes.py
 1. Crie um repositório no GitHub (por exemplo, `energias-renovaveis`).
 2. Envie todos os arquivos desta pasta para o ramo `main` (pelo site, em **Add file → Upload files**, ou com `git push`).
 3. No repositório, abra **Settings → Pages** e, em **Build and deployment → Source**, escolha **GitHub Actions**.
-4. Abra a aba **Actions**. O fluxo "Publicar jogo" roda sozinho: gera as vozes, guarda os MP3 no repositório e publica o site. A primeira execução leva de 10 a 20 minutos por causa das vozes; as seguintes são rápidas.
+4. Abra a aba **Actions**. O fluxo "Publicar jogo" roda sozinho: gera as vozes, guarda os MP3 no repositório e publica o site. A primeira execução com o Azure leva cerca de uma hora e meia por causa das vozes; as seguintes são rápidas. Para as vozes humanas dos moradores, configure antes o Azure (veja acima).
 5. O endereço do jogo aparece em **Settings → Pages**, no formato `https://seu-usuario.github.io/energias-renovaveis/`.
 
 Se preferir não usar o fluxo automático, escolha em **Settings → Pages** a opção **Deploy from a branch** (ramo `main`, pasta `/`). O jogo funciona da mesma forma, usando as vozes do navegador.
@@ -85,13 +102,16 @@ js/nucleo.js             utilidades, ícones, armazenamento
 js/qualidade.js          qualidade gráfica automática
 js/audio.js              vozes pt-BR, efeitos e trilha sonora
 js/sprites.js            construções, árvores e personagens pintados em código
+js/obras.js              desenhos exclusivos das opções de construção dos lotes
 js/terreno.js            tipos de terreno e ferramentas de mapa
 js/dados.js              missões, personagens, questões e construções
 js/falas.js              frases faladas e lista para gerar as vozes
 js/mapas.js              geração do mapa central e dos mapas das missões
 js/motor.js              renderização 2.5D, câmera, iluminação e caminhos
 js/jogo.js               regras do jogo e interface
-audio/vozes/             vozes neurais em MP3 (geradas automaticamente)
+audio/vozes/             vozes neurais em MP3 e registro das vozes usadas (gerados automaticamente)
+amostras.html            caderno de obras: construções, ícones, falas e vozes
+amostras-vozes.html      página para ouvir a voz de cada personagem
 tools/                   scripts para exportar falas e gerar vozes
 assets/                  imagem de referência e ícone
 ```

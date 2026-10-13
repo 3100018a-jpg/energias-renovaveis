@@ -61,7 +61,7 @@
       ms.intro.forEach((t) => add(t, vn));
       ms.conclusao.forEach((t) => add(t, vn));
       ms.infos.forEach((i) => add(ERS.falaInfo(i), vn));
-      ms.problemas.forEach((pb) => { add(ERS.falaProblema(pb), vn); add(pb.fala, vn); });
+      ms.problemas.forEach((pb) => { add(ERS.falaProblema(pb), vn); add(pb.fala, vn); (pb.alternativas || []).forEach((a) => add(a.fala, vn)); });
       ms.lotes.forEach((l) => l.opcoes.forEach((o) => add(ERS.falaItem(ERS.opcaoLote(o)), vn)));
       [F.extra, F.semCredito, F.requisito, F.requisito24, F.quaseLa, F.sujo, F.demolir].concat(F.dicas).forEach((t) => add(t, vn));
       ms.npcs.forEach((n) => {

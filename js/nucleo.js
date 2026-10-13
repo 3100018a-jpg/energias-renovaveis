@@ -148,6 +148,32 @@
     sair: 'M14 4h5a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1h-5 M10 16l-4-4 4-4 M6 12h10',
     lua: 'M20 14.5A8.5 8.5 0 1 1 9.5 4a7 7 0 0 0 10.5 10.5Z M17 3v3 M15.5 4.5h3',
     entardecer: 'M2 18h20 M6 18a6 6 0 0 1 12 0 M12 6v3 M4.9 10.9l2.1 2.1 M19.1 10.9l-2.1 2.1 M5 21.5h14',
+    // ---- ícones das construções ----
+    escola: 'M3 10l9-6 9 6 M5 9v12h14V9 M10 21v-5h4v5 M12 4V1.5h3.5v2H12',
+    fabrica: 'M3 21V11l5 3v-3l5 3V6h3V3h3v18Z M7 18h2 M12 18h2 M16.5 9v3',
+    barco: 'M3 15h18l-3 5H6Z M12 15V3 M12 4l6 9h-6',
+    peixe: 'M2.5 12c3-4.5 8.5-5.5 12.5-2l5-3v10l-5-3c-4 3.5-9.5 2.5-12.5-2Z M7 11h.01',
+    ave: 'M2 9c3.5-.5 6.5 1.5 10 5c3.5-3.5 6.5-5.5 10-5 M12 14v3',
+    caminhao: 'M2 5h11v11H2Z M13 9h4l4 4v3h-8 M6 20a2 2 0 1 0 0-4a2 2 0 1 0 0 4Z M17 20a2 2 0 1 0 0-4a2 2 0 1 0 0 4Z',
+    onibus: 'M4 3h16v14H4Z M4 11h16 M7 21v-4 M17 21v-4 M7.5 14h.01 M16.5 14h.01 M8 7h8',
+    termometro: 'M10 4a2 2 0 0 1 4 0v10a4 4 0 1 1-4 0Z M12 9v7',
+    lixo: 'M4 6h16 M9 6V3h6v3 M6 6l1 15h10l1-15 M10 10v7 M14 10v7',
+    vaca: 'M6 9c0-3 2.5-4 6-4s6 1 6 4v5c0 3-2.5 5.5-6 5.5S6 17 6 14Z M6 8.5L2.5 6 M18 8.5L21.5 6 M9.5 15.5h5 M9.5 11h.01 M14.5 11h.01',
+    plantacao: 'M12 21v-9 M12 12C12 8 9.5 5.5 5 5.5c0 4 2.5 6.5 7 6.5Z M12 15c0-4 2.5-6.5 7-6.5c0 4-2.5 6.5-7 6.5Z M4 21h16',
+    monte: 'M2 20l7-12 3.5 5 2.5-3.5L22 20Z M7.5 10.5l1.5 1.5 1.5-1.5',
+    predio: 'M5 21V3h10v18 M15 9h4v12 M8 7h4 M8 11h4 M8 15h4 M3 21h18',
+    bateria: 'M3 7h16v10H3Z M19 10h2v4h-2 M7 10v4 M10.5 10v4 M14 10v4',
+    cerca: 'M5 5v16 M12 5v16 M19 5v16 M3 9h18 M3 15h18 M5 5l-1 1.5 M12 5l-1 1.5 M19 5l-1 1.5',
+    proibido: 'M12 22a10 10 0 1 0 0-20a10 10 0 1 0 0 20Z M5 5l14 14',
+    chave: 'M14.5 3.5a5 5 0 0 0-5.3 6.8L3 16.5 7.5 21l6.2-6.2a5 5 0 0 0 6.8-5.3l-3.2 3.2-3.5-.5-.5-3.5Z',
+    binoculo: 'M7 19a4 4 0 1 0 0-8a4 4 0 1 0 0 8Z M17 19a4 4 0 1 0 0-8a4 4 0 1 0 0 8Z M11 15h2 M4.5 11.5L7 5h3l1 6 M19.5 11.5L17 5h-3l-1 6',
+    tenda: 'M2 10l3-6h14l3 6Z M2 10c1.5 2 3.5 2 5 0c1.5 2 3.5 2 5 0c1.5 2 3.5 2 5 0c1.5 2 3.5 2 5 0 M4 12v9h16v-9 M10 21v-5h4v5',
+    tomada: 'M9 2v5 M15 2v5 M6 7h12v4a6 6 0 0 1-12 0Z M12 17v5',
+    antena: 'M12 21V10 M8 21h8 M8.5 6a5 5 0 0 1 7 0 M5.5 3a9 9 0 0 1 13 0 M12 10a1 1 0 1 0 0-.01',
+    sismo: 'M2 12h4l2-6 3 12 3-9 2 5 2-2h4',
+    escada: 'M3 20h4v-4h4v-4h4V8h4V4h2',
+    helice: 'M12 13.5a1.5 1.5 0 1 0 0-3a1.5 1.5 0 1 0 0 3Z M12 10.5C10.8 6 11.8 3 14.5 3c1 3-.8 6-2.5 7.5 M13.3 12.8c4.4 1.4 6.3 3.9 5 6-3.1-.4-4.9-3.2-5-6 M10.7 12.8c-3.4 3-6.6 3.5-7.8 1.3 1.9-2.5 5.2-2.5 7.8-1.3',
+    setas: 'M8 20V4 M4.5 7.5L8 4l3.5 3.5 M16 4v16 M12.5 16.5L16 20l3.5-3.5',
     nuclear: 'M12 13.5a1.5 1.5 0 1 0 0-3a1.5 1.5 0 1 0 0 3Z M12 10.5L9 5.3a7 7 0 0 0-3.9 6.7H11 M13 12h5.9A7 7 0 0 0 15 5.3L12 10.5 M12.9 13.3l3 5.2a7 7 0 0 1-7.8 0l3-5.2',
   };
 
@@ -155,6 +181,13 @@
   ERS.svg = function (nome, cls, extra) {
     const d = ERS.ICONES[nome] || ERS.ICONES.info;
     return `<svg class="ico ${cls || ''}" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" ${extra || ''}><path d="${d}"/></svg>`;
+  };
+
+  // ícone composto de uma construção: símbolo principal + símbolo menor no canto
+  ERS.iconeObra = function (it, cls) {
+    const ic = it.ic || ['martelo', 'mais'];
+    const d1 = ERS.ICONES[ic[0]] || ERS.ICONES.info, d2 = ERS.ICONES[ic[1]] || ERS.ICONES.info;
+    return `<span class="ico-obra ${it.tipo || ''} ${cls || ''}" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="${d1}"/></svg><i><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="${d2}"/></svg></i></span>`;
   };
 
   // desenha ícone no canvas (centro cx,cy; tamanho s)

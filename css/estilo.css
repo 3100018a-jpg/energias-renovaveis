@@ -213,7 +213,7 @@ input[type="range"] { width: 100%; accent-color: var(--ouro); }
 /* construir */
 .cons-atual { padding: 10px 12px; border-radius: 12px; background: rgba(67, 196, 106, 0.12); border: 1px solid rgba(67, 196, 106, 0.4); }
 .cons-opcoes { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 12px; margin-top: 12px; }
-.opcao { display: grid; grid-template-rows: auto auto auto 1fr auto; gap: 8px; padding: 12px; border-radius: 16px; border: 2px solid var(--borda); background: rgba(255, 255, 255, 0.04); min-width: 0; }
+.opcao { position: relative; display: grid; grid-template-rows: auto auto auto 1fr auto; gap: 8px; padding: 12px; border-radius: 16px; border: 2px solid var(--borda); background: rgba(255, 255, 255, 0.04); min-width: 0; }
 .opcao.suja { border-color: rgba(255, 107, 74, 0.45); }
 .opcao.atencao { border-color: rgba(255, 201, 60, 0.45); }
 .opcao canvas { width: 100%; height: 120px; border-radius: 12px; background: linear-gradient(180deg, #a8e2ff, #7cc65a 70%); }
@@ -223,7 +223,7 @@ input[type="range"] { width: 100%; accent-color: var(--ouro); }
 .selo-tipo.limpa { background: rgba(67, 196, 106, 0.2); color: #8ff0ae; }
 .selo-tipo.suja { background: rgba(255, 107, 74, 0.2); color: #ffb3a3; }
 .selo-tipo.atencao { background: rgba(255, 201, 60, 0.2); color: #ffe08a; }
-.efeitos { display: flex; flex-wrap: wrap; gap: 5px; }
+.efeitos { display: flex; flex-wrap: wrap; align-content: flex-start; align-items: flex-start; gap: 5px; }
 .ef { font-size: 0.76rem; font-weight: 700; padding: 3px 7px; border-radius: 8px; background: rgba(255, 255, 255, 0.08); font-variant-numeric: tabular-nums; }
 .ef.mais { color: #8ff0ae; }
 .ef.menos { color: #ffb3a3; }
@@ -293,3 +293,24 @@ legend { padding: 0 6px; font-weight: 700; color: var(--ouro); }
 @media (prefers-reduced-motion: reduce) {
   .inicio-fundo, .girando, .vit-insignia svg { animation: none; }
 }
+
+/* ícone de cada construção: medalhão com relevo + símbolo menor no canto */
+.ico-obra { --cor-obra: #23864a; position: relative; display: inline-grid; place-items: center; flex: none; width: 46px; height: 46px; border-radius: 50%; color: #fff;
+  background: radial-gradient(circle at 32% 26%, color-mix(in srgb, var(--cor-obra) 55%, #fff) 0%, var(--cor-obra) 55%, color-mix(in srgb, var(--cor-obra) 70%, #000) 100%);
+  border: 2px solid rgba(255, 255, 255, 0.95); box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3), inset 0 -3px 6px rgba(0, 0, 0, 0.18), inset 0 2px 4px rgba(255, 255, 255, 0.35); }
+.ico-obra::after { content: ''; position: absolute; inset: 3px 9px auto 9px; height: 40%; border-radius: 50% 50% 45% 45%; background: linear-gradient(180deg, rgba(255, 255, 255, 0.42), rgba(255, 255, 255, 0)); pointer-events: none; }
+.ico-obra.suja { --cor-obra: #cf4a2f; }
+.ico-obra.atencao { --cor-obra: #d18f00; }
+.ico-obra > svg { width: 24px; height: 24px; filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.35)); }
+.ico-obra i { position: absolute; z-index: 1; right: -6px; bottom: -6px; display: grid; place-items: center; width: 23px; height: 23px; border-radius: 50%; background: radial-gradient(circle at 35% 30%, #fff, #eef2ee); color: var(--cor-obra); border: 2px solid var(--cor-obra); box-shadow: 0 2px 5px rgba(0, 0, 0, 0.3); }
+.ico-obra i svg { width: 13px; height: 13px; }
+.ico-obra.no-cartao { position: absolute; top: 20px; left: 20px; }
+.ico-obra.em-linha { width: 30px; height: 30px; vertical-align: middle; margin-right: 6px; }
+.ico-obra.em-linha::after { inset: 2px 6px auto 6px; }
+.ico-obra.em-linha > svg { width: 17px; height: 17px; }
+.ico-obra.em-linha i { width: 16px; height: 16px; right: -4px; bottom: -4px; border-width: 1.5px; }
+.ico-obra.em-linha i svg { width: 9px; height: 9px; }
+.req-opcao { margin: 0; font-size: 0.82rem; font-weight: 700; }
+.req-opcao.ok { color: #6fdc8c; }
+.req-opcao.falta { color: #ffb86b; }
+.selo-tipo.limpa + h4, .opcao .selo-tipo { justify-self: start; }

@@ -1159,4 +1159,6 @@
     else if (look.chapeu === 'cocar') { ['#d23b2f', '#ffd23f', '#2fa05a', '#2f7ad2', '#ffd23f', '#2fa05a', '#d23b2f'].forEach((k2, i) => { c.fillStyle = k2; c.beginPath(); c.ellipse(-9 + i * 3, -38, 1.6, 6, (i - 3) * 0.2, 0, 7); c.fill(); }); c.fillStyle = '#8a5a2a'; c.fillRect(-9, -34, 18, 2); }
     c.restore();
   };
+  // ferramentas de pintura compartilhadas com js/obras.js
+  SPR.h = { P, poly, caixa, cilindro, telhado, janelasE, janelasD, painelSolar, placaIcone, chamine, sombra, bolha, copa, tronco, casa, torreResfriamento, emissivo, def, VERDES, CONTORNO };
 })();

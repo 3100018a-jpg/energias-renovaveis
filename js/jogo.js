@@ -6,7 +6,9 @@
   const ERS = window.ERS;
   const U = ERS.U, M = ERS.M, A = ERS.A, Q = ERS.Q, T = ERS.T, SPR = ERS.SPR, S = ERS.S;
   const $ = (id) => document.getElementById(id);
-  const FP2 = new Set(['escola', 'usinaSolar', 'solarFlutuante', 'termeletrica', 'termeletricaDesativada', 'nuclear', 'fabrica', 'usinaReversivel', 'geotermica', 'biomassa', 'lixao', 'aterro', 'reciclagem', 'datacenter', 'plataformaPetroleo', 'beneficiamento', 'agrofloresta', 'reflorestamento', 'cavaMina', 'lagoRejeito', 'pilhaSeca']);
+  const FP2 = new Set(['escola', 'usinaSolar', 'solarFlutuante', 'termeletrica', 'termeletricaDesativada', 'nuclear', 'fabrica', 'usinaReversivel', 'geotermica', 'biomassa', 'lixao', 'aterro', 'reciclagem', 'datacenter', 'plataformaPetroleo', 'beneficiamento', 'agrofloresta', 'reflorestamento', 'cavaMina', 'lagoRejeito', 'pilhaSeca', 'solarDesmate', 'solarCava', 'escolaEficiente', 'loteamento', 'termeletricaGas', 'geotermicaRisco', 'geotermicaBinaria', 'regeneracao', 'ilpf', 'fabricaReciclados', 'recuperarMina', 'reatorModular',
+    'microrrede', 'solarBateria', 'eolicaSolar', 'eolicaH2', 'hidroSolar', 'reversivelSolar', 'portoSolar', 'eolicaCosteira', 'geoSolar', 'geoCascata', 'canaHibrida', 'aterroSolar', 'ecoparque', 'miniusina', 'escolaAldeia', 'minaHibrida', 'h2Mina', 'dcHibrido', 'redeHibrida', 'solarH2',
+    'museuEnergia', 'termeletricaBiomassa', 'patioBaterias', 'plataformaContida', 'plataformaEolica', 'recifeArtificial', 'termeletricaBiodiesel', 'usinaConvertidaGeo', 'centralTriagem', 'parqueRecuperado', 'barragemReforcada', 'reprocessamento', 'usinaDesmontada', 'carvaoSolar', 'compensador', 'nuclearDescomissionada', 'nuclearMonitorada', 'nuclearSolar']);
 
   // ---------- estado persistente ----------
   const J = (ERS.J = {
@@ -113,6 +115,7 @@
         }
         $('dialogo').classList.add('falando');
         A.falar(it.texto, ERS.VOZES[q.voz]).then(() => $('dialogo').classList.remove('falando'));
+        A.precarregar(itens.slice(i + 1, i + 3).map((x) => ({ texto: x.texto, perfil: ERS.VOZES[x.quem.voz] })));
         setTimeout(() => { const b = it.escolhas ? esc.querySelector('button') : $('dlg-proximo'); if (b) b.focus({ preventScroll: true }); }, 60);
       };
       const terminar = (acao) => {
@@ -138,7 +141,7 @@
     if (J.local === 'hub') { const n = ERS.HUB.narrador; return { nome: n.nome, papel: n.papel, voz: n.voz, look: ERS.LOOKS[n.look], cor: '#b59cff' }; }
     const n = J.ms.narrador; return { nome: n.nome, papel: n.papel, voz: n.voz, look: ERS.LOOKS[n.look], cor: J.ms.cor };
   };
-  const quemNPC = (i) => { const n = J.ms.npcs[i]; return { nome: n.nome, papel: n.papel, voz: n.voz, look: ERS.lookNPC(i * 3 + J.ms.id.length), cor: '#ffd88a' }; };
+  const quemNPC = (i) => { const n = J.ms.npcs[i]; return { nome: n.nome, papel: n.papel, voz: n.voz, look: ERS.lookNPC(i * 3 + J.ms.id.length, n.g, n.faixa), cor: '#ffd88a' }; };
 
   // ---------- indicadores ----------
   function itensConstruidos(ms, est) {
@@ -154,7 +157,7 @@
       energia += e.energia || 0; if (it.tipo !== 'suja') limpa += e.energia || 0;
       co2 += e.co2 || 0; agua += e.agua || 0; bio += e.bio || 0; social += e.social || 0;
     });
-    ms.problemas.forEach((pb) => { if (est.problemas[pb.id]) { const e = pb.acao.ef; co2 += e.co2 || 0; agua += e.agua || 0; bio += e.bio || 0; social += e.social || 0; } });
+    ms.problemas.forEach((pb) => { const k = ERS.solucaoEscolhida(pb, est.problemas[pb.id]); if (k >= 0) { const e = (ERS.solucoes(pb)[k] || pb.acao).ef; co2 += e.co2 || 0; agua += e.agua || 0; bio += e.bio || 0; social += e.social || 0; } });
     co2 = U.clamp(co2, 0, 100); agua = U.clamp(agua, 0, 100); bio = U.clamp(bio, 0, 100); social = U.clamp(social, 0, 100);
     let cob = U.clamp(limpa / ms.demanda, 0, 1);
     let h24 = null;
@@ -167,7 +170,12 @@
   const CORES_FONTE = { solar: '#ffc93c', eolica: '#7fd1ff', mare: '#1fc4c4', base: '#7ed957', hidro: '#3a7bd5', armazen: '#c38bff' };
   function simular24(ms, est) {
     const D = ms.demanda;
-    const itens = itensConstruidos(ms, est).filter((i) => i.perfil && i.perfil !== 'fossil');
+    // arranjos híbridos entram como várias fontes (ex.: sol + vento + baterias)
+    const itens = [];
+    itensConstruidos(ms, est).forEach((i) => {
+      if (i.perfis) i.perfis.forEach((p) => itens.push({ perfil: p[0], cap: p[1], armazena: p[2] }));
+      else if (i.perfil && i.perfil !== 'fossil') itens.push(i);
+    });
     (ms.existentes || []).forEach((e) => itens.push(Object.assign({ existente: true }, e)));
     const smart = itens.some((i) => i.perfil === 'smart');
     const g = (h, mu, s) => Math.exp(-0.5 * ((h - mu) / s) ** 2);
@@ -344,6 +352,15 @@
       M.periodo = periodoDe(id);
       M.carregar(mapa, { inicio });
       prepararEntidades();
+      // baixa antes as falas de abertura e as dos moradores, para não haver espera
+      const pre = [];
+      if (id === 'hub') ERS.HUB.intro.forEach((t) => pre.push({ texto: t, perfil: ERS.VOZES[ERS.HUB.narrador.voz] }));
+      else {
+        const pv = ERS.VOZES[J.ms.narrador.voz];
+        J.ms.intro.forEach((t) => pre.push({ texto: t, perfil: pv }));
+        J.ms.npcs.forEach((n) => pre.push({ texto: n.fala, perfil: ERS.VOZES[n.voz] }));
+      }
+      A.precarregar(pre);
       $('carregando').hidden = true;
       $('hud').hidden = false; $('caixa-minimapa').hidden = false;
       atualizarHUD(); atualizarPainel();
@@ -431,14 +448,28 @@
   }
   function resolverVisual(e, pb) {
     e.resolvido = true;
-    if (pb.sprResolvido) {
-      e.spr = pb.sprResolvido; e.v = 0; e.semFumaca = false;
+    const k = Math.max(0, ERS.solucaoEscolhida(pb, J.est && J.est.problemas[pb.id]));
+    const sol = ERS.solucoes(pb)[k] || {};
+    const spr = sol.spr || pb.sprResolvido;
+    if (spr) {
+      // alertas sem pegada (fogo, margens) viram uma construção de 1 tile
+      if (!e.fp) { e.x = Math.floor(e.x); e.y = Math.floor(e.y); e.fp = [1, 1]; }
+      e.spr = spr; e.v = sol.v || 0; e.semFumaca = false; e.oculto = false;
       offsetLote(e, e.spr);
       M.prepararEnt(e, 0);
+      prepararFumaca(e, spr);
     } else { e.oculto = true; e.semFumaca = true; }
   }
 
   // ---------- interação ----------
+  // ao clicar num personagem, placa ou alerta, a fala dele começa a ser baixada durante a caminhada
+  ERS.bus.on('alvo', (e) => {
+    if (!e || J.local === 'hub' || !J.ms) return;
+    const ms = J.ms;
+    if (e.kind === 'npc' && e.papelJogo === 'desafio' && ms.npcs[e.ref]) A.precarregar([{ texto: ms.npcs[e.ref].fala, perfil: ERS.VOZES[ms.npcs[e.ref].voz] }]);
+    else if (e.kind === 'info' && ms.infos[e.ref]) A.precarregar([{ texto: ERS.falaInfo(ms.infos[e.ref]), perfil: ERS.VOZES[ms.narrador.voz] }]);
+    else if (e.kind === 'problema') { const pb = ms.problemas.find((x) => x.id === e.ref); if (pb) A.precarregar([{ texto: ERS.falaProblema(pb), perfil: ERS.VOZES[ms.narrador.voz] }]); }
+  });
   ERS.bus.on('interagir', (e) => {
     if (dlgAtivo || modalAberto) return;
     M.jogador.caminho = [];
@@ -635,18 +666,7 @@
       return `<span class="ef ${bom ? 'mais' : 'menos'}">${nomes[k][0]} ${v > 0 ? '+' : ''}${v}${nomes[k][1]}</span>`;
     }).join('');
   }
-  function previa(canvas, spr, v) {
-    const c = canvas.getContext('2d');
-    const sp = SPR.get(spr, v || 0, 2);
-    const w = canvas.width, h = canvas.height;
-    c.clearRect(0, 0, w, h);
-    const g = c.createLinearGradient(0, 0, 0, h); g.addColorStop(0, '#bfe9ff'); g.addColorStop(0.62, '#e8f6ff'); g.addColorStop(0.63, '#86cf5e'); g.addColorStop(1, '#5fae45');
-    c.fillStyle = g; c.fillRect(0, 0, w, h);
-    if (!sp) return;
-    const esc = Math.min((w - 20) / sp.w, (h - 16) / sp.h, 2.2);
-    const dw = sp.w * esc, dh = sp.h * esc;
-    c.drawImage(sp.img, (w - dw) / 2, (h - dh) / 2 + 4, dw, dh);
-  }
+  function previa(canvas, spr, v) { SPR.previa(canvas, spr, v); }
   function abrirConstrucao(e) {
     const ms = J.ms, est = J.est;
     const l = ms.lotes.find((x) => x.id === e.ref);
@@ -654,7 +674,7 @@
     const atualK = est.lotes[l.id];
     const atual = atualK !== undefined && atualK !== null ? ERS.opcaoLote(l.opcoes[atualK]) : null;
     $('cons-atual').hidden = !atual;
-    if (atual) $('cons-atual').innerHTML = `Construído aqui: <b>${atual.nome}</b>. Você pode demolir e escolher outra opção.`;
+    if (atual) $('cons-atual').innerHTML = `${ERS.iconeObra(atual, 'em-linha')} Construído aqui: <b>${atual.nome}</b>. Você pode demolir e escolher outra opção.`;
     const box = $('cons-opcoes');
     box.innerHTML = '';
     l.opcoes.forEach((o, k) => {
@@ -663,7 +683,7 @@
       card.className = 'opcao ' + it.tipo;
       const rot = it.tipo === 'limpa' ? 'Sustentável' : it.tipo === 'suja' ? 'Poluente' : 'Atenção ao local';
       const ehAtual = atualK === k;
-      card.innerHTML = `<canvas width="460" height="240"></canvas><span class="selo-tipo ${it.tipo}">${rot}</span><h4>${it.nome}</h4><p>${it.desc}</p><div class="efeitos">${textoEfeitos(it.ef || {})}</div>`;
+      card.innerHTML = `<canvas width="460" height="240"></canvas>${ERS.iconeObra(it, 'no-cartao')}<span class="selo-tipo ${it.tipo}">${rot}</span><h4>${it.nome}</h4><p>${it.desc}</p><div class="efeitos">${textoEfeitos(it.ef || {})}</div>`;
       const b = document.createElement('button');
       if (ehAtual) { b.className = 'bt bt-perigo bt-peq'; b.textContent = 'Demolir (devolve ' + Math.floor(it.custo / 2) + ')'; b.onclick = () => demolir(e, l, it); }
       else if (atual) { b.className = 'bt bt-vidro bt-peq'; b.textContent = 'Demolir o atual primeiro'; b.disabled = true; }
@@ -721,52 +741,60 @@
     $('prob-titulo').textContent = pb.nome;
     $('prob-desc').textContent = pb.desc;
     $('prob-impactos').innerHTML = pb.impactos.map((i) => `<li>${i}</li>`).join('');
-    const bt = $('prob-acao');
     const req = $('prob-requisito');
-    if (est.problemas[pb.id]) {
-      req.className = 'requisito ok'; req.textContent = 'Problema resolvido. ' + pb.fala;
-      bt.hidden = true;
+    const box = $('prob-opcoes');
+    box.innerHTML = '';
+    const sols = ERS.solucoes(pb);
+    const escolhida = ERS.solucaoEscolhida(pb, est.problemas[pb.id]);
+    if (escolhida >= 0) {
+      const sol = sols[escolhida] || sols[0];
+      req.hidden = false; req.className = 'requisito ok';
+      req.innerHTML = `${ERS.iconeObra(sol, 'em-linha')} Resolvido com: <b>${sol.rotulo}</b>. ${sol.fala}`;
     } else {
-      bt.hidden = false;
+      req.hidden = false; req.className = 'requisito'; req.textContent = 'Escolha uma das soluções. Compare custos, requisitos e efeitos.';
       const c = calcular(ms, est);
-      let ok = true, txt = '';
-      if (pb.acao.requer && pb.acao.requer.cobertura) {
-        ok = c.cob >= pb.acao.requer.cobertura;
-        txt = 'Requisito: energia limpa de pelo menos ' + Math.round(pb.acao.requer.cobertura * 100) + '% da demanda (agora: ' + Math.round(c.cob * 100) + '%). ';
-      }
-      if (pb.acao.requer && pb.acao.requer.horas24) {
-        ok = c.h24.horas >= 24;
-        txt = 'Requisito: energia renovável em todas as 24 horas (agora: ' + c.h24.horas + ' de 24). ';
-      }
-      txt += 'Custo: ' + pb.acao.custo + ' créditos.';
-      req.className = 'requisito ' + (ok ? 'ok' : 'falta');
-      req.textContent = txt;
-      bt.textContent = pb.acao.rotulo;
-      bt.disabled = false;
-      bt.onclick = () => {
-        if (!ok) { A.sfx('erro'); A.falar(pb.acao.requer.horas24 ? ERS.FRASES.requisito24 : ERS.FRASES.requisito, ERS.VOZES[ms.narrador.voz]); toast('Requisito ainda não atendido', 'ruim'); return; }
-        if (est.creditos < pb.acao.custo) { A.sfx('erro'); A.falar(ERS.FRASES.semCredito, ERS.VOZES[ms.narrador.voz]); toast('Créditos insuficientes', 'ruim'); return; }
-        est.creditos -= pb.acao.custo;
-        est.problemas[pb.id] = true;
-        modificarTerreno(M.mapa, pb);
-        if (pb.apagarFogo || pb.limparOleo || pb.plantar) {
-          M.mapa.ents.forEach((x, i) => { if (x.kind === 'deco' && !x.wx) M.prepararEnt(x, i); });
-          M.ordenarEstaticas(); M.reconstruirCache(); M.listarAgua(); M.prepararMinimapa();
-        }
-        resolverVisual(e, pb);
-        M.ordenarEstaticas();
-        if (Q.cfg.assar) M.reconstruirCache();
-        fecharModal(true);
-        A.sfx('construir');
-        M.celebrar(e);
-        ganharPontos(150, 'problema resolvido');
-        salvarEst(); atualizarHUD(); atualizarPainel();
-        if (ms.final && est.problemas.carvao && est.problemas.nuclear) addConquista('zerofossil');
-        setTimeout(() => dialogo([{ quem: quemNarrador(), texto: pb.fala }]), 600);
-      };
+      sols.forEach((sol, k) => {
+        let ok = true, txt = '';
+        if (sol.requer && sol.requer.cobertura) { ok = c.cob >= sol.requer.cobertura; txt = `Requer energia limpa de ${Math.round(sol.requer.cobertura * 100)}% da demanda (agora: ${Math.round(c.cob * 100)}%).`; }
+        if (sol.requer && sol.requer.horas24) { ok = c.h24.horas >= 24; txt = `Requer energia renovável nas 24 horas (agora: ${c.h24.horas} de 24).`; }
+        const tipo = sol.tipo || 'limpa';
+        const rot = tipo === 'limpa' ? 'Solução completa' : 'Atenção: solução parcial';
+        const card = document.createElement('div');
+        card.className = 'opcao ' + tipo;
+        card.innerHTML = `<canvas width="460" height="240"></canvas>${ERS.iconeObra(Object.assign({ tipo }, sol), 'no-cartao')}<span class="selo-tipo ${tipo}">${rot}</span><h4>${sol.rotulo}</h4><p>${k === 0 ? 'A solução recomendada pelos especialistas.' : sol.desc}</p><div class="efeitos">${textoEfeitos(sol.ef || {})}</div>${txt ? `<p class="req-opcao ${ok ? 'ok' : 'falta'}">${txt}</p>` : ''}`;
+        const b = document.createElement('button');
+        b.className = 'bt bt-ouro bt-peq';
+        b.textContent = sol.custo ? 'Aplicar · ' + sol.custo + ' créditos' : 'Aplicar';
+        b.onclick = () => aplicarSolucao(e, pb, k, sol, ok);
+        card.appendChild(b);
+        box.appendChild(card);
+        previa(card.querySelector('canvas'), sol.spr || pb.sprResolvido || pb.spr, 0);
+      });
     }
     abrirModal('modal-problema');
     A.falar(ERS.falaProblema(pb), ERS.VOZES[ms.narrador.voz]);
+  }
+  function aplicarSolucao(e, pb, k, sol, ok) {
+    const ms = J.ms, est = J.est;
+    if (!ok) { A.sfx('erro'); A.falar(sol.requer.horas24 ? ERS.FRASES.requisito24 : ERS.FRASES.requisito, ERS.VOZES[ms.narrador.voz]); toast('Requisito ainda não atendido', 'ruim'); return; }
+    if (est.creditos < sol.custo) { A.sfx('erro'); A.falar(ERS.FRASES.semCredito, ERS.VOZES[ms.narrador.voz]); toast('Créditos insuficientes', 'ruim'); return; }
+    est.creditos -= sol.custo;
+    est.problemas[pb.id] = k === 0 ? true : k;
+    modificarTerreno(M.mapa, pb);
+    if (pb.apagarFogo || pb.limparOleo || pb.plantar) {
+      M.mapa.ents.forEach((x, i) => { if (x.kind === 'deco' && !x.wx) M.prepararEnt(x, i); });
+      M.ordenarEstaticas(); M.reconstruirCache(); M.listarAgua(); M.prepararMinimapa();
+    }
+    resolverVisual(e, pb);
+    M.ordenarEstaticas();
+    if (Q.cfg.assar) M.reconstruirCache();
+    fecharModal(true);
+    A.sfx('construir');
+    M.celebrar(e);
+    ganharPontos(sol.tipo === 'atencao' ? 80 : 150, sol.tipo === 'atencao' ? 'solução parcial' : 'problema resolvido');
+    salvarEst(); atualizarHUD(); atualizarPainel();
+    if (ms.final && est.problemas.carvao && est.problemas.nuclear) addConquista('zerofossil');
+    setTimeout(() => dialogo([{ quem: quemNarrador(), texto: sol.fala || pb.fala }]), 600);
   }
 
   // ---------- conclusão de missão ----------

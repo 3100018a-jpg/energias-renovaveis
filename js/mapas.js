@@ -65,17 +65,45 @@
     zona(m, cx, cy, rx, ry, (x, y) => { m.set(x, y, tipo, h === undefined ? Math.max(1, m.H(x, y)) : h); }, irr);
   }
   function rio(m, pts, larg, tipo, hFn) {
-    return m.caminho(pts, larg, (x, y) => {
+    const tt = tipo === undefined ? T.RIO : tipo;
+    const cel = [];
+    const tp = m.caminho(pts, larg, (x, y) => {
       const h = hFn ? hFn(x, y) : 0;
-      m.set(x, y, tipo === undefined ? T.RIO : tipo, h);
+      m.set(x, y, tt, h);
+      cel.push([x, y]);
     });
+    // rios estreitos: liga trechos que só se tocam pela ponta (evita poças soltas)
+    cel.forEach(([x, y]) => {
+      [[1, 1], [1, -1], [-1, 1], [-1, -1]].forEach((d) => {
+        const ax = x + d[0], ay = y + d[1];
+        if (!m.dentro(ax, ay) || m.T(ax, ay) !== tt || m.T(x + d[0], y) === tt || m.T(x, y + d[1]) === tt) return;
+        if (m.dentro(x + d[0], y) && !m.bloq[m.i(x + d[0], y)]) m.set(x + d[0], y, tt, hFn ? hFn(x + d[0], y) : 0);
+      });
+    });
+    return tp;
   }
+  // estrada contínua: cada tile toca o próximo por um lado inteiro (nunca só pela ponta)
   function estrada(m, pts) {
-    m.caminho(pts, 1, (x, y) => {
+    const put = (x, y) => {
+      if (!m.dentro(x, y)) return;
       const t = m.T(x, y);
       if (T.ehAgua(t)) m.set(x, y, T.PONTE, 1);
       else if (t !== T.PONTE) m.set(x, y, T.ESTRADA, Math.max(1, Math.min(m.H(x, y), 2)));
-    });
+    };
+    const tp = pts.map((p) => m.tile(p[0], p[1]));
+    let x = tp[0][0], y = tp[0][1];
+    put(x, y);
+    for (let k = 1; k < tp.length; k++) {
+      const bx = tp[k][0], by = tp[k][1];
+      const dx = Math.abs(bx - x), dy = Math.abs(by - y), sx = Math.sign(bx - x), sy = Math.sign(by - y);
+      let err = dx - dy;
+      while (x !== bx || y !== by) {
+        // um passo por eixo de cada vez (caminho 4-conectado, em escada suave)
+        if (err * 2 > -dy && x !== bx) { err -= dy; x += sx; }
+        else { err += dx; y += sy; }
+        put(x, y);
+      }
+    }
   }
   // suaviza degraus de estrada (evita degraus > 1)
   function suavizarEstradas(m) {
@@ -320,7 +348,7 @@
       const p = pos.npcs[i]; if (!p) return;
       const t = m.tile(p[0], p[1]);
       preparar(t[0], t[1]);
-      m.ent({ kind: 'npc', papelJogo: 'desafio', ref: i, x: t[0] + 0.5, y: t[1] + 0.5, nome: n.nome, papel: n.papel, voz: n.voz, look: ERS.lookNPC(i * 3 + ms.id.length), marcador: 'desafio', dir: i % 2 ? 1 : -1 });
+      m.ent({ kind: 'npc', papelJogo: 'desafio', ref: i, x: t[0] + 0.5, y: t[1] + 0.5, nome: n.nome, papel: n.papel, voz: n.voz, look: ERS.lookNPC(i * 3 + ms.id.length, n.g, n.faixa), marcador: 'desafio', dir: i % 2 ? 1 : -1 });
       m.ocupar(t[0], t[1], 1, 1);
     });
     (ms.lotes || []).forEach((l) => {
@@ -360,7 +388,71 @@
     preparar(ti[0], ti[1]);
     m.inicio = ti;
     m.ocupar(ti[0], ti[1], 1, 1);
-    m.ocupar(ti[0], ti[1], 1, 1);
+    // lotes e moradores sem posição fixa: procura um lugar livre, plano e espaçado
+    (ms.lotes || []).forEach((l) => {
+      if (pos.lotes[l.id]) return;
+      const t = acharLugar(m, l.fp[0], l.fp[1], { min: 5, max: 17, folga: 3 });
+      if (!t) return;
+      preparar(t[0], t[1], l.fp);
+      for (let j = 0; j < l.fp[1]; j++) for (let i = 0; i < l.fp[0]; i++) if (m.T(t[0] + i, t[1] + j) === T.FLORESTA) m.set(t[0] + i, t[1] + j, T.TERRA);
+      m.ent({ kind: 'lote', ref: l.id, spr: 'lote', x: t[0], y: t[1], fp: l.fp, rotulo: l.rotulo, base: l.base || null });
+      m.ocupar(t[0], t[1], l.fp[0], l.fp[1]);
+    });
+    (ms.npcs || []).forEach((n, i) => {
+      if (pos.npcs[i]) return;
+      const t = acharLugar(m, 1, 1, { min: 4, max: 15, folga: 2.5, espalhar: true });
+      if (!t) return;
+      preparar(t[0], t[1]);
+      m.ent({ kind: 'npc', papelJogo: 'desafio', ref: i, x: t[0] + 0.5, y: t[1] + 0.5, nome: n.nome, papel: n.papel, voz: n.voz, look: ERS.lookNPC(i * 3 + ms.id.length, n.g, n.faixa), marcador: 'desafio', dir: i % 2 ? 1 : -1 });
+      m.ocupar(t[0], t[1], 1, 1);
+    });
+  }
+  // lugar livre para w×d tiles perto do início: terra firme, sem estrada, quase plano,
+  // longe de outros pontos de interesse e alcançável a pé
+  function acharLugar(m, w, d, op) {
+    const pontos = m.ents.filter((e) => e.kind === 'npc' || e.kind === 'lote' || e.kind === 'problema' || e.kind === 'info').map((e) => [e.x + (e.fp ? e.fp[0] / 2 : 0), e.y + (e.fp ? e.fp[1] / 2 : 0), e.kind === 'npc' ? 1 : 0]);
+    pontos.push([m.inicio[0] + 0.5, m.inicio[1] + 0.5, 0]);
+    // tiles alcançáveis a partir do início
+    const N = m.N, alc = new Uint8Array(N * N), fila = [m.inicio];
+    alc[m.i(m.inicio[0], m.inicio[1])] = 1;
+    while (fila.length) {
+      const [x, y] = fila.shift();
+      [[1, 0], [-1, 0], [0, 1], [0, -1]].forEach((q) => {
+        const nx = x + q[0], ny = y + q[1];
+        if (!m.dentro(nx, ny) || alc[m.i(nx, ny)] || m.bloq[m.i(nx, ny)] || !T.props[m.T(nx, ny)].andavel) return;
+        if (Math.abs(m.H(nx, ny) - m.H(x, y)) > 1) return;
+        alc[m.i(nx, ny)] = 1; fila.push([nx, ny]);
+      });
+    }
+    const ok = (x, y) => {
+      const h0 = m.H(x, y);
+      for (let j = 0; j < d; j++) for (let i = 0; i < w; i++) {
+        const xx = x + i, yy = y + j;
+        if (!m.dentro(xx, yy) || m.bloq[m.i(xx, yy)]) return false;
+        const t = m.T(xx, yy);
+        if (!T.props[t].andavel || T.ehAgua(t) || t === T.ESTRADA || t === T.PONTE || t === T.LAVA || t === T.ROCHA) return false;
+        if (Math.abs(m.H(xx, yy) - h0) > 1) return false;
+      }
+      // precisa de um vizinho alcançável para o jogador chegar
+      for (let j = -1; j <= d; j++) for (let i = -1; i <= w; i++) {
+        const xx = x + i, yy = y + j;
+        if ((i < 0 || i >= w || j < 0 || j >= d) && m.dentro(xx, yy) && alc[m.i(xx, yy)]) return true;
+      }
+      return false;
+    };
+    let melhor = null;
+    for (let y = 1; y < N - d - 1; y++) for (let x = 1; x < N - w - 1; x++) {
+      const cx = x + w / 2, cy = y + d / 2;
+      const dist = Math.hypot(cx - m.inicio[0] - 0.5, cy - m.inicio[1] - 0.5);
+      if (dist < op.min || dist > op.max) continue;
+      let perto = 1e9, pertoNpc = 1e9;
+      pontos.forEach((p) => { const dd = Math.hypot(p[0] - cx, p[1] - cy); perto = Math.min(perto, dd); if (p[2]) pertoNpc = Math.min(pertoNpc, dd); });
+      if (perto < op.folga + Math.max(w, d) / 2) continue;
+      if (!ok(x, y)) continue;
+      const nota = (op.espalhar ? Math.min(pertoNpc, 9) * 2 : 0) + Math.min(perto, 8) - Math.abs(dist - (op.min + op.max) / 2) * 0.4;
+      if (!melhor || nota > melhor[0]) melhor = [nota, x, y];
+    }
+    return melhor ? [melhor[1], melhor[2]] : null;
   }
 
   // ---------------- MAPA CENTRAL ----------------
@@ -407,7 +499,8 @@
     // colinas eólicas
     zona(m, 0.09, 0.64, 0.1, 0.12, (x, y, d) => { if (!T.ehAgua(m.T(x, y))) m.set(x, y, T.GRAMA, 1 + Math.round((1 - d) * 3)); }, 0.3);
     // córrego poluído da termelétrica até o mar
-    rio(m, [[0.27, 0.64], [0.3, 0.7], [0.31, 0.78], [0.32, 0.86]], 1.4, T.OLEO);
+    // canal que devolve ao mar a água aquecida no resfriamento da termelétrica (poluição térmica)
+    rio(m, [[0.27, 0.64], [0.3, 0.7], [0.31, 0.78], [0.32, 0.86]], 1.8);
     // lixão
     tipoEm(m, 0.26, 0.4, 0.03, 0.035, T.LIXO, 1, 0.2);
     // porto
@@ -854,10 +947,69 @@
     return m;
   };
 
+  // acabamento das estradas: liga trechos que só se tocam pela ponta e nivela degraus
+  function acabarEstradas(m) {
+    const eh = (x, y) => m.dentro(x, y) && (m.T(x, y) === T.ESTRADA || m.T(x, y) === T.PONTE);
+    const livre = (x, y) => m.dentro(x, y) && !m.bloq[m.i(x, y)] && !T.ehAgua(m.T(x, y)) && T.props[m.T(x, y)].andavel;
+    const D4 = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+    for (let y = 0; y < m.N; y++) for (let x = 0; x < m.N; x++) {
+      if (!eh(x, y)) continue;
+      [[1, 1], [1, -1], [-1, 1], [-1, -1]].forEach((d) => {
+        if (!eh(x + d[0], y + d[1]) || eh(x + d[0], y) || eh(x, y + d[1])) return;
+        const opc = [[x + d[0], y], [x, y + d[1]]].filter((q) => livre(q[0], q[1]));
+        if (opc.length) { const q = opc[0]; m.set(q[0], q[1], T.ESTRADA, Math.max(1, Math.min(m.H(x, y), m.H(x + d[0], y + d[1])))); }
+      });
+    }
+    let mudou = false;
+    for (let k = 0; k < 4; k++) for (let y = 0; y < m.N; y++) for (let x = 0; x < m.N; x++) {
+      if (!eh(x, y) || m.T(x, y) === T.PONTE) continue;
+      D4.forEach((d) => {
+        const nx = x + d[0], ny = y + d[1];
+        if (!eh(nx, ny) || m.T(nx, ny) === T.PONTE) return;
+        const a = m.H(x, y), b = m.H(nx, ny);
+        if (a > b) { m.setH(x, y, b); mudou = true; }
+      });
+    }
+    // as pontes ficam na mesma altura das estradas que chegam até elas
+    for (let y = 0; y < m.N; y++) for (let x = 0; x < m.N; x++) {
+      if (m.T(x, y) !== T.ESTRADA) continue;
+      D4.forEach((d) => { if (m.T(x + d[0], y + d[1]) === T.PONTE && m.H(x, y) > 1) { m.setH(x, y, 1); mudou = true; } });
+    }
+    return mudou;
+  }
+
+  // construções extras de cada lugar (casas, comércio, sítios), em terrenos livres
+  const EXTRAS = {
+    solar: ['casaSolar', 'casaSolar', 'predioSolar', 'aquecedorSolar', 'carregadorVE', 'quiosque', 'casa', 'praca'],
+    eolica: ['fazenda', 'casa', 'casa', 'cooperativa', 'quiosque', 'fazenda', 'casaSolar'],
+    hidro: ['casa', 'casa', 'cooperativa', 'quiosque', 'fazenda', 'viveiro', 'casaSolar'],
+    mare: ['quiosque', 'quiosque', 'guardaSol', 'guardaSol', 'casa', 'casa', 'casaSolar'],
+    geo: ['estufa', 'estufa', 'casa', 'casa', 'quiosque', 'cooperativa', 'casaSolar'],
+    cana: ['fazenda', 'fazenda', 'casa', 'casa', 'cooperativa', 'casaSolar', 'quiosque'],
+    residuos: ['ecoponto', 'compostagem', 'casa', 'casa', 'predio', 'praca', 'casaSolar'],
+    floresta: ['casa', 'casa', 'cooperativa', 'viveiro', 'quiosque', 'casaSolar'],
+    mineracao: ['casa', 'casa', 'casa', 'escavadeira', 'caminhaoMina', 'cooperativa', 'igreja'],
+    dados: ['predio', 'predio', 'casa', 'casa', 'praca', 'predioSolar', 'carregadorVE'],
+    rede: ['predio', 'predioSolar', 'casaSolar', 'casaSolar', 'praca', 'carregadorVE', 'quiosque'],
+  };
+  function povoar(m, lista) {
+    lista.forEach((spr, k) => {
+      const t = acharLugar(m, 1, 1, { min: 6, max: 24, folga: 2.2 });
+      if (!t) return;
+      // tira árvores soltas do lugar escolhido
+      m.ents = m.ents.filter((e) => !(e.kind === 'deco' && !e.fp && Math.floor(e.x) === t[0] && Math.floor(e.y) === t[1]));
+      const e = ed(m, spr, t[0], t[1], [1, 1], k + 2);
+      if (e) e.extra = true;
+    });
+  }
+
   ERS.gerarMapa = function (id) {
     const f = MAPAS[id];
     const m = f();
     m.id = id;
+    acabarEstradas(m);
+    if (EXTRAS[id]) povoar(m, EXTRAS[id]);
+    garantirAcesso(m);
     return m;
   };
 })();

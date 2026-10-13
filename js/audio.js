@@ -27,6 +27,7 @@
   // ---------- perfis das vozes (personagens) ----------
   // edge: voz neural usada pelo gerador de MP3; tom/ritmo: ajustes no navegador
   A.chaveVoz = function (p) {
+    if (p.azure) return 'az:' + p.azure + '|' + (p.rate || '+0%');
     return (p.edge || 'pt-BR-FranciscaNeural') + '|' + (p.rate || '+0%') + '|' + (p.pitch || '+0Hz');
   };
   A.idFala = function (texto, perfil) {
@@ -42,18 +43,22 @@
   // texto falado: siglas e símbolos lidos de forma natural
   A.textoFalado = function (t) {
     return A.limparTexto(t)
-      .replace(/\bCO2\b/g, 'C O dois')
-      .replace(/\bH2S\b/g, 'H dois S')
+      .replace(/\bCO2\b/g, 'cê ó dois')
+      .replace(/\bH2S\b/g, 'agá dois ésse')
       .replace(/\bkWh\b/g, 'quilowatt-hora')
       .replace(/\bMWh\b/g, 'megawatt-hora')
       .replace(/\bMW\b/g, 'megawatts')
       .replace(/\bGW\b/g, 'gigawatts')
       .replace(/\bkW\b/g, 'quilowatts')
-      .replace(/\bPUE\b/g, 'P U E')
+      .replace(/\bPUE\b/g, 'pê u é')
+      .replace(/\bPCH\b/g, 'pê cê agá')
+      .replace(/\bLEDs?\b/g, (m) => (m === 'LEDs' ? 'léds' : 'léd'))
+      .replace(/ ?\(2G\)/g, '')
+      .replace(/\b2G\b/g, 'de segunda geração')
       .replace(/\bSAFs?\b/g, (m) => (m === 'SAFs' ? 'sistemas agroflorestais' : 'sistema agroflorestal'))
-      .replace(/\bAPPs?\b/g, (m) => (m === 'APPs' ? 'A P Pês' : 'A P P'))
+      .replace(/\bAPPs?\b/g, (m) => (m === 'APPs' ? 'a pê pês' : 'a pê pê'))
       .replace(/\bSIN\b/g, 'Sistema Interligado Nacional')
-      .replace(/\bEIA\/RIMA\b/g, 'E I A RIMA')
+      .replace(/\bEIA\/RIMA\b/g, 'é i a rima')
       .replace(/(\d+)\s?%/g, '$1 por cento')
       .replace(/°C/g, ' graus Celsius')
       .replace(/ +\./g, '.');
@@ -81,6 +86,8 @@
     A.vozes = todas
       .filter((v) => /^pt[-_]BR$/i.test(v.lang) || /portugu[eê]s.*brasil/i.test(v.name))
       .filter((v) => !/multiling/i.test(v.name))
+      // só vozes neurais e naturais; vozes robóticas antigas ficam de fora (nesse caso, só legenda)
+      .filter((v) => /natural|neural|online|premium|enhanced|aprimorad|superior/i.test(v.name))
       .map((v) => ({ v, nota: pontuar(v), genero: NOMES_M.test(v.name) ? 'M' : NOMES_F.test(v.name) ? 'F' : '?' }))
       .sort((a, b) => b.nota - a.nota);
     ERS.bus.emit('vozes', A.vozes);
@@ -90,14 +97,15 @@
     speechSynthesis.onvoiceschanged = A.carregarVozes;
   }
 
-  A.escolherVoz = function (genero) {
+  A.escolherVoz = function (genero, variante) {
     if (!A.vozes.length) return null;
     if (A.vozEscolhida) {
       const f = A.vozes.find((x) => x.v.name === A.vozEscolhida);
       if (f) return { item: f, exata: f.genero === genero };
     }
-    const mesma = A.vozes.find((x) => x.genero === genero);
-    if (mesma && mesma.nota >= A.vozes[0].nota - 6) return { item: mesma, exata: true };
+    // moradores alternam entre as boas vozes pt-BR do mesmo gênero instaladas no navegador
+    const melhores = A.vozes.filter((x) => x.genero === genero && x.nota >= A.vozes[0].nota - 6);
+    if (melhores.length) return { item: melhores[(variante || 0) % melhores.length], exata: true };
     return { item: A.vozes[0], exata: A.vozes[0].genero === genero };
   };
 
@@ -132,7 +140,7 @@
   function falarSintese(texto, perfil, token) {
     return new Promise((res) => {
       if (!('speechSynthesis' in window)) return res();
-      const esc = A.escolherVoz(perfil.genero || 'F');
+      const esc = A.escolherVoz(perfil.genero || 'F', perfil.variante);
       if (!esc) return res();
       const pedacos = dividir(A.textoFalado(texto));
       let i = 0;
@@ -159,17 +167,42 @@
     });
   }
 
-  function tocarMp3(id, token) {
+  // falas já baixadas, prontas para tocar sem espera
+  const cacheAudio = new Map();
+  function audioDe(id) {
+    let au = cacheAudio.get(id);
+    if (!au) {
+      au = new Audio((window.ERS_VOZES_BASE || 'audio/vozes/') + id + '.mp3');
+      au.preload = 'auto';
+      cacheAudio.set(id, au);
+      if (cacheAudio.size > 60) { const k = cacheAudio.keys().next().value; cacheAudio.delete(k); }
+    }
+    return au;
+  }
+  // baixa antecipadamente as gravações das próximas falas
+  A.precarregar = function (itens) {
+    (itens || []).forEach((it) => {
+      if (!it || !it.texto) return;
+      const id = A.idFala(A.limparTexto(it.texto), it.perfil || {});
+      if (A.temMp3(id)) audioDe(id);
+    });
+  };
+  function tocarMp3(id, token, texto) {
     return new Promise((res) => {
-      const base = window.ERS_VOZES_BASE || 'audio/vozes/';
-      const au = new Audio(base + id + '.mp3');
-      au.volume = A.volVoz;
-      A._audio = au;
+      const au = audioDe(id);
       let fim = false;
       const ok = () => { if (!fim) { fim = true; res(true); } };
+      const falhou = () => { if (!fim) { fim = true; res(false); } };
+      try { au.pause(); au.currentTime = 0; } catch (e) {}
+      au.volume = A.volVoz;
+      A._audio = au;
+      // gravação muito mais curta que o texto: arquivo danificado, não toca
+      const conferir = () => { if (texto && isFinite(au.duration) && au.duration < Math.max(0.6, texto.length / 40)) { cacheAudio.delete(id); try { au.pause(); } catch (e) {} falhou(); } };
+      au.onloadedmetadata = conferir;
       au.onended = ok;
-      au.onerror = () => { if (!fim) { fim = true; res(false); } };
-      au.play().catch(() => { if (!fim) { fim = true; res(false); } });
+      au.onerror = falhou;
+      if (au.readyState >= 1) conferir();
+      if (!fim) au.play().catch(falhou);
       const verif = setInterval(() => { if (token !== A._token) { clearInterval(verif); try { au.pause(); } catch (e) {} ok(); } if (fim) clearInterval(verif); }, 120);
     });
   }
@@ -187,7 +220,7 @@
     ERS.bus.emit('fala', { texto: limpo, perfil });
     const id = A.idFala(limpo, perfil);
     let feito = false;
-    if (A.temMp3(id)) feito = await tocarMp3(id, token);
+    if (A.temMp3(id)) feito = await tocarMp3(id, token, limpo);
     if (!feito && token === A._token) await falarSintese(limpo, perfil, token);
     if (token === A._token && !opts.manter) { A.falando = false; A.musicaDuck(false); ERS.bus.emit('fala', null); }
   };

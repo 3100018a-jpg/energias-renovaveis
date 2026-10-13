@@ -47,8 +47,18 @@
   });
   // personagens secundários gerados
   const CAMISAS = ['#d9533b', '#3a7bd5', '#f0c419', '#2fa05a', '#8a5bd0', '#ff8a3a', '#1fa3a3', '#e85a8a'];
-  ERS.lookNPC = function (k) {
-    return { pele: PELE[k % 5], cabelo: ['#1a1a1a', '#4a2a14', '#d8d8d8', '#8a5a2a', '#2a1a10'][(k * 3) % 5], tipoCabelo: k % 5, camisa: CAMISAS[k % CAMISAS.length], calca: ['#2a3a5a', '#3a3a3a', '#5a4a2a'][k % 3], chapeu: k % 4 === 1 ? 'bone' : k % 7 === 3 ? 'palha' : undefined, corChapeu: CAMISAS[(k + 3) % 8], oculos: k % 6 === 2 };
+  // aparência dos moradores combinando com o gênero e a idade (cabelo grisalho para os mais velhos)
+  ERS.lookNPC = function (k, g, faixa) {
+    const cabelos = ['#1a1a1a', '#4a2a14', '#8a5a2a', '#2a1a10', '#b8562a'];
+    const tipos = g === 'F' ? [1, 3, 2, 1] : g === 'M' ? [0, 2, 4, 0] : [0, 1, 2, 3, 4];
+    const look = {
+      pele: PELE[k % 5], cabelo: faixa === 'idoso' ? ['#d8d8d8', '#bfbfbf', '#e8e4dc'][k % 3] : cabelos[(k * 3) % 5],
+      tipoCabelo: tipos[k % tipos.length], camisa: CAMISAS[k % CAMISAS.length], calca: ['#2a3a5a', '#3a3a3a', '#5a4a2a'][k % 3],
+      chapeu: k % 4 === 1 ? (faixa === 'jovem' ? 'bone' : 'palha') : k % 7 === 3 ? 'bone' : undefined, corChapeu: CAMISAS[(k + 3) % 8],
+      oculos: faixa === 'idoso' ? k % 2 === 0 : k % 6 === 2,
+    };
+    if (g === 'M' && faixa !== 'jovem' && k % 3 === 0) look.barba = true;
+    return look;
   };
   ERS.AVATARES = [
     { nome: 'Estudante 1', pele: PELE[1], cabelo: '#2a1a10', tipoCabelo: 0, camisa: '#2fa05a', calca: '#2a4a7a', chapeu: 'bone', corChapeu: '#ffd23f', mochila: '#d9533b' },
@@ -128,7 +138,124 @@
     hidrogenio: { nome: 'Planta de hidrogênio verde', spr: 'hidrogenio', custo: 200, tipo: 'limpa', ef: { energia: 2, co2: -6 }, perfil: 'h2', cap: 4, armazena: 60, desc: 'Usa energia renovável para separar a água e guardar hidrogênio.' },
     redeInteligente: { nome: 'Centro de controle da rede inteligente', spr: 'centroControle', custo: 160, tipo: 'limpa', ef: { social: 6, co2: -4 }, perfil: 'smart', desc: 'Medidores inteligentes deslocam consumo e reduzem o pico da noite.' },
     usinaBiogas: { nome: 'Usina de biogás', spr: 'usinaBiogas', custo: 170, tipo: 'limpa', ef: { energia: 5, co2: -6 }, perfil: 'base', cap: 5, desc: 'Energia firme a partir de resíduos orgânicos.' },
+    // ---------- arranjos híbridos: energias limpas que se completam ----------
+    microrredeSolar: { nome: 'Microrrede solar do bairro', custo: 170, tipo: 'limpa', ef: { energia: 6, co2: -7, social: 8 }, perfis: [['solar', 5], ['bateria', 2]], desc: 'Telhados solares e baterias compartilhadas: o bairro guarda a energia do dia e usa à noite.' },
+    solarBateria: { nome: 'Usina solar com baterias', custo: 290, tipo: 'limpa', ef: { energia: 13, co2: -13, bio: 1 }, perfis: [['solar', 10], ['bateria', 4]], desc: 'Os painéis geram de dia e as baterias entregam a energia no começo da noite, quando o consumo é maior.' },
+    eolicaSolar: { nome: 'Usina híbrida eólica e solar', custo: 300, tipo: 'limpa', ef: { energia: 14, co2: -14, bio: -1, social: 2 }, perfis: [['eolica', 7], ['solar', 6]], desc: 'Aerogeradores e painéis dividem o terreno e a linha de transmissão: o sol rende de dia e o vento costuma soprar mais à noite.' },
+    eolicaH2: { nome: 'Parque eólico com hidrogênio verde', custo: 280, tipo: 'limpa', ef: { energia: 8, co2: -11, social: 2 }, perfis: [['eolica', 6], ['h2', 3, 40]], desc: 'Quando venta mais do que a cidade consome, a sobra vira hidrogênio para usar depois.' },
+    hidroSolar: { nome: 'Hidrelétrica com usina solar na margem', custo: 260, tipo: 'limpa', ef: { energia: 11, co2: -10, agua: 3 }, perfis: [['solar', 9]], desc: 'Enquanto o sol gera, a hidrelétrica economiza a água do reservatório para a noite e para a seca.' },
+    reversivelSolar: { nome: 'Bombeamento solar para um lago no alto', custo: 300, tipo: 'limpa', ef: { energia: 8, co2: -8 }, perfis: [['solar', 6], ['hidro', 4, 30]], desc: 'De dia, a energia solar bombeia água para um lago no alto. À noite, a água desce e gera eletricidade.' },
+    portoSolar: { nome: 'Porto com telhados solares e baterias', custo: 220, tipo: 'limpa', ef: { energia: 6, co2: -9, social: 3 }, desc: 'Os galpões geram energia e as baterias abastecem os navios atracados, que desligam os motores a diesel.' },
+    eolicaCosteira: { nome: 'Eólica costeira com baterias', custo: 260, tipo: 'limpa', ef: { energia: 9, co2: -9, bio: -2, social: 1 }, desc: 'Os ventos do mar movem os aerogeradores, e as baterias seguram a energia nas horas de calmaria.' },
+    geoSolar: { nome: 'Geotérmica com usina solar', custo: 330, tipo: 'limpa', ef: { energia: 15, co2: -13, agua: -1, social: 2 }, perfis: [['base', 5], ['solar', 6]], desc: 'O calor da Terra garante energia dia e noite, e os painéis reforçam a geração nas horas de sol.' },
+    geoCascata: { nome: 'Calor da Terra em cascata', custo: 240, tipo: 'limpa', ef: { energia: 7, co2: -8, social: 8 }, desc: 'O vapor gera eletricidade e o calor que sobra aquece estufas e seca a colheita, sem desperdício.' },
+    canaHibrida: { nome: 'Usina tri-híbrida: bagaço, biogás e sol', custo: 340, tipo: 'limpa', ef: { energia: 16, co2: -14, agua: 4, social: 3 }, desc: 'Na safra, o bagaço gera vapor; a vinhaça vira biogás; e os painéis completam a geração o ano todo.' },
+    aterroSolar: { nome: 'Aterro encerrado com biogás e painéis', custo: 260, tipo: 'limpa', ef: { energia: 9, co2: -13, social: 2 }, desc: 'O metano do lixo vira eletricidade, e o terreno do aterro recebe painéis solares, sem ocupar área nova.' },
+    ecoparque: { nome: 'Ecoparque com telhado solar e baterias', custo: 230, tipo: 'limpa', ef: { energia: 4, co2: -8, social: 10 }, desc: 'Reciclagem, oficina e escola ambiental funcionando com energia própria.' },
+    miniusina: { nome: 'Miniusina comunitária: sol, biogás e baterias', custo: 200, tipo: 'limpa', ef: { energia: 6, co2: -8, social: 8, agua: 2 }, desc: 'A comunidade gera e guarda a própria energia, sem depender de gerador a diesel.' },
+    escolaAldeia: { nome: 'Sistema solar isolado para a escola da aldeia', custo: 140, tipo: 'limpa', ef: { energia: 2, co2: -4, social: 10 }, desc: 'Painéis e baterias levam luz, internet e geladeira para vacinas à comunidade.' },
+    minaHibrida: { nome: 'Sol e vento com baterias para a mina', custo: 290, tipo: 'limpa', ef: { energia: 12, co2: -13, social: 2 }, desc: 'A mina troca o diesel por energia limpa, com baterias para os turnos da noite.' },
+    h2Mina: { nome: 'Hidrogênio verde para os caminhões da mina', custo: 260, tipo: 'limpa', ef: { energia: 3, co2: -12, social: 3 }, desc: 'Painéis solares produzem hidrogênio, que abastece os caminhões gigantes no lugar do diesel.' },
+    dcHibrido: { nome: 'Energia 24 horas: sol, vento e baterias', custo: 340, tipo: 'limpa', ef: { energia: 16, co2: -16, social: 2 }, desc: 'O data center contrata sol de dia, vento à noite e baterias para os intervalos, sem geradores a diesel.' },
+    redeHibrida: { nome: 'Usina híbrida eólica-solar com baterias', custo: 380, tipo: 'limpa', ef: { energia: 18, co2: -16, social: 2 }, perfis: [['eolica', 8], ['solar', 8], ['bateria', 5]], desc: 'Três tecnologias no mesmo ponto de conexão: sol, vento e baterias se completam ao longo do dia.' },
+    solarH2: { nome: 'Solar com hidrogênio verde', custo: 300, tipo: 'limpa', ef: { energia: 6, co2: -10 }, perfis: [['solar', 8], ['h2', 4, 80]], desc: 'A sobra do meio-dia vira hidrogênio, que é guardado e usado à noite ou nos dias nublados.' },
+    // ---------- opções extras dos lotes ----------
+    eficienciaEscola: { nome: 'Lâmpadas LED e ventilação natural na escola', spr: 'escola', custo: 70, tipo: 'limpa', ef: { energia: 2, co2: -3, social: 4 }, desc: 'Eficiência energética: a escola gasta menos luz e menos ar-condicionado.' },
+    loteamentoMata: { nome: 'Loteamento derrubando a mata', spr: 'casa', custo: 60, tipo: 'suja', ef: { bio: -18, co2: 5, agua: -4, social: 2 }, desc: 'Abre ruas e casas no morro, mas desmata, impermeabiliza o solo e aumenta o risco de deslizamentos.' },
+    barcoSolar: { nome: 'Barcos elétricos movidos a energia solar', spr: 'barco', custo: 80, tipo: 'limpa', ef: { co2: -4, social: 5 }, desc: 'Transporte e passeios silenciosos na água, sem queimar gasolina nem diesel.' },
+    marinaGasolina: { nome: 'Marina para lanchas a gasolina', spr: 'veleiro', custo: 70, tipo: 'suja', ef: { co2: 6, agua: -6, social: 2 }, desc: 'Atrai turistas, mas os motores poluem a água, fazem barulho e emitem gás carbônico.' },
+    condominioSolar: { nome: 'Prédio com geração solar compartilhada', spr: 'predioSolar', custo: 130, tipo: 'limpa', ef: { energia: 3, co2: -4, social: 6 }, desc: 'Os moradores dividem os créditos de energia dos painéis instalados no telhado.' },
+    pontoSolar: { nome: 'Ponto de ônibus elétrico com painel solar', spr: 'ponto', custo: 60, tipo: 'limpa', ef: { co2: -4, social: 5 }, desc: 'Incentiva o transporte coletivo elétrico e ilumina o ponto à noite com energia do Sol.' },
+    mirante: { nome: 'Mirante para observação de aves', spr: 'quiosque', custo: 50, tipo: 'limpa', ef: { bio: 4, social: 6 }, desc: 'Ecoturismo e educação ambiental, mantendo a lagoa livre para as aves migratórias.' },
+    repotenciacao: { nome: 'Repotenciação das turbinas da barragem', spr: 'subestacao', custo: 120, tipo: 'limpa', ef: { energia: 4, co2: -3, social: 1 }, desc: 'Turbinas modernas geram mais energia na mesma barragem, sem alagar novas áreas.' },
+    monitorRio: { nome: 'Estação de monitoramento do rio', spr: 'centroControle', custo: 70, tipo: 'limpa', ef: { agua: 6, bio: 2, social: 4 }, desc: 'Mede a vazão e a qualidade da água e avisa a população sobre cheias.' },
+    hidrocinetica: { nome: 'Turbina hidrocinética no leito do rio', spr: 'turbinaMare', custo: 130, tipo: 'limpa', ef: { energia: 3, co2: -3, bio: -1 }, desc: 'Aproveita a correnteza sem construir barragem nem formar reservatório.' },
+    ecoturismo: { nome: 'Corredeira preservada para o ecoturismo', spr: 'quiosque', custo: 50, tipo: 'limpa', ef: { bio: 5, social: 7, co2: -1 }, desc: 'Rafting e trilhas geram renda para a comunidade e mantêm o rio livre para os peixes.' },
+    viveiroMangue: { nome: 'Viveiro de mudas de mangue', spr: 'viveiro', custo: 60, tipo: 'limpa', ef: { bio: 8, social: 5, co2: -2 }, desc: 'Produz mudas para recuperar trechos degradados do manguezal com as marisqueiras.' },
+    carcinicultura: { nome: 'Fazenda de camarão no manguezal', spr: 'tanqueVinhaca', custo: 50, tipo: 'suja', ef: { bio: -18, agua: -8, social: 2 }, desc: 'Dá lucro rápido, mas derruba o mangue e contamina a água com ração e produtos químicos.' },
+    geotermicaBinaria: { nome: 'Usina geotérmica de ciclo binário', spr: 'geotermica', custo: 260, tipo: 'limpa', ef: { energia: 10, co2: -10, agua: 2, social: 2 }, perfil: 'base', cap: 5, desc: 'Circuito fechado: o calor passa para outro fluido e quase nenhum gás chega ao ar.' },
+    descarteGeo: { nome: 'Descartar a água geotérmica no rio', spr: 'tanqueVinhaca', custo: 0, tipo: 'suja', ef: { agua: -14, bio: -6, social: -3 }, desc: 'Sem custo, mas a água quente e cheia de sais e metais prejudica o rio.' },
+    secadorGeo: { nome: 'Secador de frutas e grãos com calor da Terra', spr: 'cooperativa', custo: 70, tipo: 'limpa', ef: { energia: 1, social: 6, co2: -3 }, desc: 'Uso direto do calor: os agricultores secam a colheita sem lenha nem gás.' },
+    irrigacao: { nome: 'Irrigação por gotejamento', spr: 'irrigacaoGotejo', custo: 50, tipo: 'limpa', ef: { agua: 6, social: 3 }, desc: 'Leva a água gota a gota até a raiz das plantas e evita o desperdício.' },
+    redeCalor: { nome: 'Rede de calor para casas e escola', spr: 'eta', custo: 110, tipo: 'limpa', ef: { energia: 3, co2: -4, social: 4 }, desc: 'A água quente circula em canos e aquece banhos e salas sem gastar eletricidade.' },
+    biometano: { nome: 'Planta de biometano para a frota', spr: 'usinaBiogas', custo: 170, tipo: 'limpa', ef: { energia: 3, co2: -8, social: 3 }, desc: 'Purifica o biogás da vinhaça e o usa no lugar do diesel nos caminhões e tratores.' },
+    fertirrigacao: { nome: 'Fertirrigação controlada com vinhaça', spr: 'irrigacaoGotejo', custo: 60, tipo: 'limpa', ef: { agua: 3, bio: 1, social: 2 }, desc: 'A vinhaça diluída, na dose certa, aduba a lavoura. Em excesso, contaminaria o lençol freático.' },
+    palhaSolo: { nome: 'Manter parte da palha sobre o solo', spr: 'canavial', custo: 20, tipo: 'limpa', ef: { bio: 4, agua: 4, co2: -3 }, desc: 'A palha protege o solo da erosão, guarda umidade e devolve nutrientes.' },
+    pulverizacaoAerea: { nome: 'Pulverização aérea perto do córrego', spr: 'canavial', custo: 30, tipo: 'suja', ef: { agua: -10, bio: -8, social: -6 }, desc: 'O vento leva o agrotóxico para a água, as abelhas e as casas vizinhas.' },
+    maisCana: { nome: 'Ocupar a faixa com mais cana', spr: 'canavial', custo: 40, tipo: 'suja', ef: { bio: -10, co2: 2, social: 1 }, desc: 'Monocultura contínua: mais colheita, mas sem abrigo para os animais nem para os polinizadores.' },
+    fabricaReciclados: { nome: 'Indústria de produtos reciclados', spr: 'fabrica', custo: 200, tipo: 'limpa', ef: { social: 8, co2: -5, bio: 2 }, desc: 'Plástico e papel recolhidos viram telhas, madeira plástica e embalagens novas.' },
+    queimadorMetano: { nome: 'Queimador de metano do aterro (flare)', spr: 'filtroGas', custo: 60, tipo: 'atencao', ef: { co2: -5 }, desc: 'Queimar o metano reduz o efeito estufa, mas desperdiça a energia que o gás poderia gerar.' },
+    feiraTrocas: { nome: 'Feira de trocas e oficina de reparos', spr: 'quiosque', custo: 40, tipo: 'limpa', ef: { social: 7, co2: -3 }, desc: 'Reduzir e reutilizar vêm antes de reciclar: objetos consertados não viram lixo.' },
+    simbiose: { nome: 'Simbiose industrial entre fábricas', spr: 'containers', custo: 110, tipo: 'limpa', ef: { co2: -5, agua: 3, social: 3 }, desc: 'O resíduo de uma fábrica vira matéria-prima de outra, e menos material vai para o aterro.' },
+    lagoaDejetos: { nome: 'Lagoa aberta de dejetos', spr: 'tanqueVinhaca', custo: 20, tipo: 'suja', ef: { agua: -12, co2: 6, social: -6 }, desc: 'Barata, mas solta metano, mau cheiro e pode vazar para o rio.' },
+    regeneracao: { nome: 'Cercar a área para a regeneração natural', spr: 'reflorestamento', v: 1, custo: 40, tipo: 'limpa', ef: { bio: 9, co2: -5, agua: 3 }, desc: 'Sem fogo e sem gado, as sementes do solo e da mata vizinha brotam sozinhas.' },
+    monocultura: { nome: 'Lavoura de soja em monocultura', spr: 'canavial', custo: 80, tipo: 'suja', ef: { bio: -12, co2: 6, agua: -6, social: 2 }, desc: 'Gera renda, mas substitui a floresta por uma só planta e usa muito agrotóxico.' },
+    ilpf: { nome: 'Integração lavoura-pecuária-floresta', spr: 'agrofloresta', v: 1, custo: 110, tipo: 'limpa', ef: { bio: 6, co2: -6, social: 6, agua: 2 }, desc: 'Árvores, lavoura e gado na mesma área recuperam o pasto sem novos desmatamentos.' },
+    gadoIgarape: { nome: 'Liberar o gado na margem do igarapé', spr: 'fazenda', custo: 10, tipo: 'suja', ef: { agua: -10, bio: -8 }, desc: 'O pisoteio derruba a margem, suja a água e impede a mata de voltar.' },
+    agroindustria: { nome: 'Agroindústria de castanha e açaí', spr: 'cooperativa', v: 1, custo: 110, tipo: 'limpa', ef: { energia: 1, social: 10, co2: -2 }, desc: 'A floresta em pé gera renda: a comunidade beneficia os frutos com energia solar.' },
+    solarCava: { nome: 'Usina solar sobre a cava recuperada', spr: 'usinaSolar', custo: 250, tipo: 'limpa', ef: { energia: 10, co2: -10, bio: 1 }, desc: 'Aproveita a área já degradada pela mina, sem desmatar um novo terreno.' },
+    despejoMina: { nome: 'Lançar a água da mina direto no rio', spr: 'tanqueVinhaca', custo: 0, tipo: 'suja', ef: { agua: -16, bio: -8, social: -6 }, desc: 'Sem custo, mas a água ácida e com metais contamina o rio e a pesca.' },
+    caminhaoEletrico: { nome: 'Caminhões elétricos na mineração', spr: 'caminhaoMina', custo: 130, tipo: 'limpa', ef: { co2: -6, social: 2 }, desc: 'Trocam o diesel por baterias e reduzem fumaça e ruído no pátio.' },
+    reatorModular: { nome: 'Pequeno reator nuclear modular', spr: 'nuclear', custo: 300, tipo: 'atencao', ef: { energia: 14, co2: -10, agua: -6, social: -8 }, desc: 'Energia firme sem gás carbônico, mas gera lixo radioativo e exige segurança rigorosa.' },
+    resfriamentoLiquido: { nome: 'Resfriamento líquido direto nos chips', spr: 'resfriamentoAgua', custo: 180, tipo: 'limpa', ef: { agua: 8, energia: 4, co2: -4 }, desc: 'Um líquido em circuito fechado tira o calor dos processadores com pouca água e pouca energia.' },
+    pracaPublica: { nome: 'Praça pública arborizada', spr: 'praca', custo: 60, tipo: 'limpa', ef: { social: 8, bio: 3, co2: -1 }, desc: 'Lazer para o bairro e árvores que amortecem o ruído e o calor.' },
+    calorCasas: { nome: 'Calor dos servidores para a água das casas', spr: 'eta', custo: 120, tipo: 'limpa', ef: { energia: 3, co2: -4, social: 5 }, desc: 'O calor que seria jogado fora aquece a água do banho no bairro vizinho.' },
+    celulaCombustivel: { nome: 'Células a combustível de hidrogênio verde', spr: 'hidrogenio', custo: 170, tipo: 'limpa', ef: { energia: 2, co2: -4 }, desc: 'Energia de emergência sem fumaça: o hidrogênio vira eletricidade e libera só água.' },
+    prediosEficientes: { nome: 'Prédios eficientes no centro', spr: 'predioSolar', custo: 120, tipo: 'limpa', ef: { energia: 2, co2: -4, social: 4 }, desc: 'LED, isolamento térmico e painéis no telhado reduzem o consumo da cidade.' },
   };
+
+  // ---------- desenho e ícone próprios de cada construção ----------
+  // spr: desenho exclusivo no mapa; ic: [símbolo principal, símbolo menor]
+  const OBRA = {
+    escolaSolar: ['escola', 1, 'escola', 'sol'], aquecedorSolar: [0, 0, 'sol', 'termometro'], casaSolar: [0, 0, 'casa', 'sol'],
+    usinaSolar: [0, 0, 'sol', 'raio'], solarFlutuante: [0, 0, 'sol', 'onda'], painelSolar: [0, 0, 'sol', 'pessoa'],
+    bateria: [0, 0, 'bateria', 'raio'], carregadorVE: [0, 0, 'tomada', 'sol'], geradorDiesel: [0, 0, 'fumaca', 'raio'],
+    termeletricaOleo: [0, 0, 'fumaca', 'gota'], termeletricaGas: ['termeletricaGas', 0, 'fumaca', 'chama'], parque: ['parqueTrilha', 0, 'arvore', 'pessoa'],
+    torreEolica: [0, 0, 'vento', 'raio'], eolicaOffshore: [0, 0, 'vento', 'onda'], subestacao: [0, 0, 'rede', 'raio'],
+    escadaPeixes: [0, 0, 'peixe', 'escada'], pch: [0, 0, 'gota', 'raio'], grandeBarragem: [0, 0, 'gota', 'alerta'],
+    usinaReversivel: [0, 0, 'gota', 'ciclo'], centroComunitario: [0, 0, 'pessoa', 'sol'], barragemMare: [0, 0, 'onda', 'raio'],
+    barragemMareMangue: ['barragemMangue', 0, 'onda', 'alerta'], turbinaMare: [0, 0, 'helice', 'onda'], boiaOndas: [0, 0, 'onda', 'setas'],
+    preservarMangue: ['manguezal', 0, 'arvore', 'onda'], eletrificarPorto: ['tomadaNavio', 0, 'barco', 'tomada'], geotermica: [0, 0, 'monte', 'raio'],
+    geotermicaRisco: ['geotermicaRisco', 0, 'monte', 'alerta'], pocoReinjecao: [0, 0, 'gota', 'setas'], estufaGeo: [0, 0, 'plantacao', 'termometro'],
+    estacaoSismica: ['estacaoSismica', 0, 'sismo', 'antena'], filtroGas: [0, 0, 'fumaca', 'ok'], termas: ['termas', 0, 'termometro', 'pessoa'],
+    biomassa: [0, 0, 'folha', 'raio'], biogasVinhaca: ['biogasVinhaca', 0, 'chama', 'gota'], vinhacaRio: ['vinhacaRio', 0, 'gota', 'proibido'],
+    etanol2G: [0, 0, 'folha', 'gota'], mataCiliar: [0, 0, 'arvore', 'gota'], expandirCana: [0, 0, 'plantacao', 'alerta'],
+    agrofloresta: [0, 0, 'arvore', 'plantacao'], biodigestor: [0, 0, 'vaca', 'chama'], reciclagem: [0, 0, 'ciclo', 'pessoa'],
+    usinaBiogasAterro: ['biogasAterro', 0, 'lixo', 'chama'], incinerador: [0, 0, 'lixo', 'fumaca'], ecoponto: [0, 0, 'lixo', 'ciclo'],
+    compostagem: [0, 0, 'plantacao', 'ciclo'], logisticaReversa: ['logisticaReversa', 0, 'caminhao', 'ciclo'], reflorestamento: [0, 0, 'arvore', 'mais'],
+    pastoExtensivo: [0, 0, 'vaca', 'alerta'], viveiro: [0, 0, 'plantacao', 'pessoa'], recuperarMina: ['recuperarMina', 0, 'monte', 'arvore'],
+    novaCava: [0, 0, 'monte', 'proibido'], reciclaEletronicos: [0, 0, 'gema', 'ciclo'], eta: [0, 0, 'gota', 'ok'],
+    eolicaSemImas: ['eolicaSemImas', 0, 'vento', 'folha'], resfriamentoPotavel: [0, 0, 'servidor', 'gota'], resfriamentoReuso: ['resfriamentoReuso', 0, 'servidor', 'ciclo'],
+    muroAcustico: [0, 0, 'mudo', 'folha'], cinturaoVerde: [0, 0, 'arvore', 'mudo'], estufaCalor: ['estufaPiscina', 0, 'servidor', 'plantacao'],
+    hidrogenio: [0, 0, 'gota', 'bateria'], redeInteligente: [0, 0, 'rede', 'tela'], usinaBiogas: [0, 0, 'chama', 'folha'],
+    eficienciaEscola: ['escolaEficiente', 0, 'escola', 'raio'], loteamentoMata: ['loteamento', 0, 'casa', 'alerta'], barcoSolar: ['barcoSolar', 0, 'barco', 'sol'],
+    marinaGasolina: ['marina', 0, 'barco', 'fumaca'], condominioSolar: [0, 0, 'predio', 'sol'], pontoSolar: ['pontoSolar', 0, 'onibus', 'sol'],
+    mirante: ['mirante', 0, 'binoculo', 'ave'], repotenciacao: ['turbinaNova', 0, 'chave', 'raio'], monitorRio: ['monitorRio', 0, 'gota', 'antena'],
+    hidrocinetica: ['hidrocinetica', 0, 'helice', 'gota'], ecoturismo: ['raftingBase', 0, 'barco', 'pessoa'], viveiroMangue: ['viveiroMangue', 0, 'plantacao', 'onda'],
+    carcinicultura: ['camarao', 0, 'peixe', 'alerta'], geotermicaBinaria: ['geotermicaBinaria', 0, 'monte', 'ciclo'], descarteGeo: ['descarteGeo', 0, 'termometro', 'proibido'],
+    secadorGeo: ['secadorGeo', 0, 'termometro', 'plantacao'], irrigacao: [0, 0, 'gota', 'plantacao'], redeCalor: ['redeCalor', 0, 'termometro', 'casa'],
+    biometano: ['biometano', 0, 'caminhao', 'folha'], fertirrigacao: ['fertirrigacao', 0, 'plantacao', 'gota'], palhaSolo: ['palhada', 0, 'plantacao', 'folha'],
+    pulverizacaoAerea: ['pulverizacao', 0, 'plantacao', 'proibido'], maisCana: ['canaMonocultura', 0, 'plantacao', 'mais'], fabricaReciclados: ['fabricaReciclados', 0, 'fabrica', 'ciclo'],
+    queimadorMetano: ['flare', 0, 'chama', 'alerta'], feiraTrocas: ['feira', 0, 'tenda', 'ciclo'], simbiose: ['simbiose', 0, 'fabrica', 'setas'],
+    lagoaDejetos: ['lagoaDejetos', 0, 'vaca', 'proibido'], regeneracao: ['regeneracao', 0, 'cerca', 'arvore'], monocultura: ['soja', 0, 'plantacao', 'moeda'],
+    ilpf: ['ilpf', 0, 'vaca', 'arvore'], gadoIgarape: ['gadoMargem', 0, 'vaca', 'gota'], agroindustria: ['agroindustria', 0, 'fabrica', 'folha'],
+    solarCava: ['solarCava', 0, 'sol', 'monte'], despejoMina: ['despejoMina', 0, 'monte', 'gota'], caminhaoEletrico: ['caminhaoEletrico', 0, 'caminhao', 'raio'],
+    reatorModular: ['reatorModular', 0, 'nuclear', 'alerta'], resfriamentoLiquido: ['resfriamentoLiquido', 0, 'servidor', 'termometro'], pracaPublica: ['pracaArborizada', 0, 'arvore', 'casa'],
+    calorCasas: ['calorCasas', 0, 'servidor', 'casa'], celulaCombustivel: ['celulaCombustivel', 0, 'tomada', 'gota'], prediosEficientes: ['predioEficiente', 0, 'predio', 'raio'],
+    microrredeSolar: ['microrrede', 0, 'casa', 'bateria'], solarBateria: ['solarBateria', 0, 'sol', 'bateria'], eolicaSolar: ['eolicaSolar', 0, 'vento', 'sol'],
+    eolicaH2: ['eolicaH2', 0, 'vento', 'gota'], hidroSolar: ['hidroSolar', 0, 'gota', 'sol'], reversivelSolar: ['reversivelSolar', 0, 'sol', 'ciclo'],
+    portoSolar: ['portoSolar', 0, 'barco', 'bateria'], eolicaCosteira: ['eolicaCosteira', 0, 'vento', 'bateria'], geoSolar: ['geoSolar', 0, 'monte', 'sol'],
+    geoCascata: ['geoCascata', 0, 'termometro', 'ciclo'], canaHibrida: ['canaHibrida', 0, 'folha', 'sol'], aterroSolar: ['aterroSolar', 0, 'lixo', 'sol'],
+    ecoparque: ['ecoparque', 0, 'ciclo', 'bateria'], miniusina: ['miniusina', 0, 'pessoa', 'bateria'], escolaAldeia: ['escolaAldeia', 0, 'escola', 'bateria'],
+    minaHibrida: ['minaHibrida', 0, 'monte', 'vento'], h2Mina: ['h2Mina', 0, 'caminhao', 'gota'], dcHibrido: ['dcHibrido', 0, 'servidor', 'sol'],
+    redeHibrida: ['redeHibrida', 0, 'rede', 'sol'], solarH2: ['solarH2', 0, 'sol', 'gota'],
+  };
+  Object.keys(OBRA).forEach((k) => {
+    const o = OBRA[k], it = ERS.CATALOGO[k];
+    if (!it) throw new Error('Construção desconhecida: ' + k);
+    if (o[0]) { it.spr = o[0]; it.v = o[1] || 0; }
+    it.ic = [o[2], o[3]];
+  });
 
   // ---------- missões ----------
   const MISSOES = [];
@@ -147,18 +274,21 @@
     conclusao: ['Incrível! O bairro agora produz energia com o Sol, de forma limpa e silenciosa.', 'Você ganhou a insígnia Raio de Sol. Leve esse conhecimento para as próximas missões!'],
     demanda: 30, base: { energia: 0, co2: 90, agua: 45, bio: 45, social: 45 },
     npcs: [
-      { nome: 'Seu Joaquim', papel: 'Comerciante', voz: 'homemB', fala: 'Minha padaria gasta muita energia. Será que o Sol pode ajudar? Responda este desafio!' },
-      { nome: 'Ana', papel: 'Estudante do 9º ano', voz: 'jovem', fala: 'Estou fazendo um trabalho sobre energia solar. Me ajuda com esta pergunta?' },
-      { nome: 'Dona Cida', papel: 'Aposentada', voz: 'mulherB', fala: 'Meu neto quer colocar painéis no telhado. Antes, quero entender uma coisa.' },
-      { nome: 'Pedro', papel: 'Eletricista', voz: 'homemA', fala: 'Eu instalo painéis solares. Quero ver se você entende do assunto!' },
+      { nome: 'Seu Joaquim', papel: 'Comerciante', g: 'M', faixa: 'idoso', fala: 'Minha padaria gasta muita energia. Será que o Sol pode ajudar? Responda este desafio!' },
+      { nome: 'Ana', papel: 'Estudante do 9º ano', g: 'F', faixa: 'jovem', fala: 'Estou fazendo um trabalho sobre energia solar. Me ajuda com esta pergunta?' },
+      { nome: 'Dona Cida', papel: 'Aposentada', g: 'F', faixa: 'idoso', fala: 'Meu neto quer colocar painéis no telhado. Antes, quero entender uma coisa.' },
+      { nome: 'Pedro', papel: 'Eletricista', g: 'M', faixa: 'adulto', fala: 'Eu instalo painéis solares. Quero ver se você entende do assunto!' },
+      { nome: 'Marta', papel: 'Síndica do condomínio', g: 'F', faixa: 'adulto', fala: 'Quero instalar painéis no prédio e dividir os créditos de energia entre os vizinhos. Você me ajuda com esta dúvida?' },
+      { nome: 'Rodrigo', papel: 'Entregador de bicicleta elétrica', g: 'M', faixa: 'jovem', fala: 'Recarrego minha bicicleta elétrica no ponto solar da praça. Topa um desafio rápido?' },
     ],
     lotes: [
-      { id: 'escola', rotulo: 'Telhado da Escola Municipal', fp: [2, 2], base: { spr: 'escola', v: 0 }, opcoes: ['escolaSolar', 'geradorDiesel'] },
-      { id: 'degradado', rotulo: 'Terreno degradado (antigo depósito)', fp: [2, 2], opcoes: ['usinaSolar', 'termeletricaOleo'] },
-      { id: 'mata', rotulo: 'Mata nativa do morro', fp: [2, 2], opcoes: [{ item: 'usinaSolar', nome: 'Usina solar derrubando a mata', tipo: 'atencao', ef: { energia: 12, co2: -6, bio: -22, social: -4 }, desc: 'Gera energia limpa, mas derruba a floresta e expulsa os animais.' }, 'parque'] },
-      { id: 'lago', rotulo: 'Lago da represa', fp: [2, 2], agua: true, opcoes: ['solarFlutuante'] },
-      { id: 'casas', rotulo: 'Rua das Palmeiras', fp: [1, 1], opcoes: ['casaSolar', 'aquecedorSolar'] },
-      { id: 'estac', rotulo: 'Estacionamento do mercado', fp: [1, 1], opcoes: ['carregadorVE', 'bateria', 'geradorDiesel'] },
+      { id: 'escola', rotulo: 'Telhado da Escola Municipal', fp: [2, 2], base: { spr: 'escola', v: 0 }, opcoes: ['escolaSolar', 'geradorDiesel', 'eficienciaEscola'] },
+      { id: 'degradado', rotulo: 'Terreno degradado (antigo depósito)', fp: [2, 2], opcoes: ['usinaSolar', 'termeletricaOleo', 'painelSolar', 'termeletricaGas'] },
+      { id: 'mata', rotulo: 'Mata nativa do morro', fp: [2, 2], opcoes: [{ item: 'usinaSolar', nome: 'Usina solar derrubando a mata', spr: 'solarDesmate', ic: ['sol', 'alerta'], tipo: 'atencao', ef: { energia: 12, co2: -6, bio: -22, social: -4 }, desc: 'Gera energia limpa, mas derruba a floresta e expulsa os animais.' }, 'parque', 'viveiro', 'loteamentoMata'] },
+      { id: 'lago', rotulo: 'Lago da represa', fp: [2, 2], agua: true, opcoes: ['solarFlutuante', 'barcoSolar', 'marinaGasolina'] },
+      { id: 'casas', rotulo: 'Rua das Palmeiras', fp: [1, 1], opcoes: ['casaSolar', 'aquecedorSolar', 'condominioSolar'] },
+      { id: 'estac', rotulo: 'Estacionamento do mercado', fp: [1, 1], opcoes: ['carregadorVE', 'bateria', 'geradorDiesel', 'pontoSolar'] },
+      { id: 'hibrido', rotulo: 'Terreno do bairro planejado', fp: [2, 2], opcoes: ['microrredeSolar', 'solarBateria', 'termeletricaGas'] },
     ],
     problemas: [
       { id: 'diesel', nome: 'Gerador a diesel do bairro', spr: 'geradorDiesel', sprResolvido: 'bateria', desc: 'O gerador queima óleo diesel o dia inteiro, faz barulho e solta fumaça.', impactos: ['Emite CO₂ e fuligem', 'Poluição sonora', 'Combustível caro e fóssil'], acao: { rotulo: 'Desligar o gerador e instalar baterias', custo: 60, requer: { cobertura: 0.5 }, ef: { co2: -35, social: 8 } }, fala: 'Muito bem! Sem o diesel, o ar fica mais limpo e as noites, silenciosas.' },
@@ -192,19 +322,22 @@
     conclusao: ['Os aerogeradores giram e a fumaça do carvão sumiu do céu da serra.', 'Você conquistou a insígnia Vento Forte!'],
     demanda: 30, base: { energia: 0, co2: 92, agua: 45, bio: 50, social: 45 },
     npcs: [
-      { nome: 'Seu Tião', papel: 'Pescador', voz: 'homemB', fala: 'O vento aqui é bom para velejar. Será que também serve para gerar energia?' },
-      { nome: 'Lia', papel: 'Bióloga de aves', voz: 'mulherA', fala: 'Eu estudo as aves migratórias desta serra. Tenho um desafio para você.' },
-      { nome: 'Dona Rosa', papel: 'Agricultora', voz: 'mulherB', fala: 'Uma empresa quer alugar minha terra para uma torre. Antes de decidir, me ajude.' },
-      { nome: 'Caio', papel: 'Técnico de manutenção', voz: 'jovemM', fala: 'Eu subo nas torres para fazer manutenção. Bora testar seu conhecimento?' },
+      { nome: 'Seu Tião', papel: 'Pescador', g: 'M', faixa: 'idoso', fala: 'O vento aqui é bom para velejar. Será que também serve para gerar energia?' },
+      { nome: 'Lia', papel: 'Bióloga de aves', g: 'F', faixa: 'adulto', fala: 'Eu estudo as aves migratórias desta serra. Tenho um desafio para você.' },
+      { nome: 'Dona Rosa', papel: 'Agricultora', g: 'F', faixa: 'idoso', fala: 'Uma empresa quer alugar minha terra para uma torre. Antes de decidir, me ajude.' },
+      { nome: 'Caio', papel: 'Técnico de manutenção', g: 'M', faixa: 'jovem', fala: 'Eu subo nas torres para fazer manutenção. Bora testar seu conhecimento?' },
+      { nome: 'Joana', papel: 'Presidente da associação de moradores', g: 'F', faixa: 'adulto', fala: 'Nossa associação negocia o uso das terras para os aerogeradores. Quero ver se você entende do assunto.' },
+      { nome: 'Seu Severino', papel: 'Criador de cabras', g: 'M', faixa: 'idoso', fala: 'Crio cabras aqui na serra há quarenta anos, e o vento nunca faltou. Responda esta pergunta!' },
     ],
     lotes: [
-      { id: 'crista1', rotulo: 'Crista da serra (norte)', fp: [1, 1], opcoes: ['torreEolica', 'geradorDiesel'] },
-      { id: 'crista2', rotulo: 'Crista da serra (centro)', fp: [1, 1], opcoes: ['torreEolica', 'geradorDiesel'] },
-      { id: 'crista3', rotulo: 'Crista da serra (sul)', fp: [1, 1], opcoes: ['torreEolica', 'painelSolar'] },
-      { id: 'vila', rotulo: 'Terreno colado às casas da vila', fp: [1, 1], opcoes: [{ item: 'torreEolica', nome: 'Aerogerador ao lado das casas', tipo: 'atencao', ef: { energia: 6, co2: -7, social: -14 }, desc: 'Gera energia, mas o ruído e a sombra das pás incomodam os moradores.' }, 'painelSolar'] },
-      { id: 'aves', rotulo: 'Lagoa da rota das aves', fp: [1, 1], opcoes: [{ item: 'torreEolica', nome: 'Aerogerador na rota migratória', tipo: 'atencao', ef: { energia: 6, co2: -7, bio: -16 }, desc: 'Gera energia, mas aumenta o risco de colisão de aves.' }, 'parque'] },
-      { id: 'mar', rotulo: 'Mar raso (offshore)', fp: [1, 1], agua: true, opcoes: ['eolicaOffshore'] },
-      { id: 'sub', rotulo: 'Área da subestação', fp: [1, 1], opcoes: ['subestacao', 'bateria'] },
+      { id: 'crista1', rotulo: 'Crista da serra (norte)', fp: [1, 1], opcoes: ['torreEolica', 'geradorDiesel', 'eolicaSemImas'] },
+      { id: 'crista2', rotulo: 'Crista da serra (centro)', fp: [1, 1], opcoes: ['torreEolica', 'geradorDiesel', 'eolicaSemImas', 'painelSolar'] },
+      { id: 'crista3', rotulo: 'Crista da serra (sul)', fp: [1, 1], opcoes: ['torreEolica', 'painelSolar', 'eolicaSemImas'] },
+      { id: 'vila', rotulo: 'Terreno colado às casas da vila', fp: [1, 1], opcoes: [{ item: 'torreEolica', nome: 'Aerogerador ao lado das casas', spr: 'eolicaVila', ic: ['vento', 'casa'], tipo: 'atencao', ef: { energia: 6, co2: -7, social: -14 }, desc: 'Gera energia, mas o ruído e a sombra das pás incomodam os moradores.' }, 'painelSolar', 'casaSolar', 'centroComunitario'] },
+      { id: 'aves', rotulo: 'Lagoa da rota das aves', fp: [1, 1], opcoes: [{ item: 'torreEolica', nome: 'Aerogerador na rota migratória', spr: 'eolicaAves', ic: ['vento', 'ave'], tipo: 'atencao', ef: { energia: 6, co2: -7, bio: -16 }, desc: 'Gera energia, mas aumenta o risco de colisão de aves.' }, 'parque', 'mataCiliar', 'mirante'] },
+      { id: 'mar', rotulo: 'Mar raso (offshore)', fp: [1, 1], agua: true, opcoes: ['eolicaOffshore', 'boiaOndas'] },
+      { id: 'sub', rotulo: 'Área da subestação', fp: [1, 1], opcoes: ['subestacao', 'bateria', 'redeInteligente', 'hidrogenio'] },
+      { id: 'hibrido', rotulo: 'Planalto entre os parques', fp: [2, 2], opcoes: ['eolicaSolar', 'eolicaH2'] },
     ],
     problemas: [
       { id: 'carvao', nome: 'Termelétrica a carvão mineral', spr: 'termeletrica', sprResolvido: 'termeletricaDesativada', fp: [2, 2], desc: 'Queima carvão mineral dia e noite para gerar eletricidade.', impactos: ['Grande emissão de CO₂', 'Gases que formam chuva ácida', 'Água quente devolvida ao rio'], acao: { rotulo: 'Desativar e transformar em Museu da Energia', custo: 80, requer: { cobertura: 0.6 }, ef: { co2: -45, agua: 8, social: 8 } }, fala: 'A chaminé apagou! A antiga usina virou museu e conta a história da transição energética.' },
@@ -238,17 +371,20 @@
     conclusao: ['O rio respira de novo. Os peixes voltaram a subir na piracema e a energia continua chegando à cidade.', 'Você ganhou a insígnia Guardiã das Águas. Obrigada por ouvir o povo do rio!'],
     demanda: 30, base: { energia: 12, co2: 70, agua: 40, bio: 35, social: 40 },
     npcs: [
-      { nome: 'Seu Bené', papel: 'Pescador artesanal', voz: 'homemB', fala: 'Antes da barragem, a gente pescava fartura. Me responde uma coisa, por favor.' },
-      { nome: 'Iracema', papel: 'Professora da vila', voz: 'mulherB', fala: 'Meus alunos perguntaram como a água vira energia. Vamos ver se você sabe!' },
-      { nome: 'Davi', papel: 'Engenheiro da usina', voz: 'homemA', fala: 'Eu opero as turbinas desta usina. Tenho um desafio técnico para você.' },
-      { nome: 'Mel', papel: 'Estudante', voz: 'jovem', fala: 'Eu quero ser geógrafa! Me ajuda nessa questão sobre rios e energia?' },
+      { nome: 'Seu Bené', papel: 'Pescador artesanal', g: 'M', faixa: 'idoso', fala: 'Antes da barragem, a gente pescava fartura. Me responde uma coisa, por favor.' },
+      { nome: 'Iracema', papel: 'Professora da vila', g: 'F', faixa: 'adulto', fala: 'Meus alunos perguntaram como a água vira energia. Vamos ver se você sabe!' },
+      { nome: 'Davi', papel: 'Engenheiro da usina', g: 'M', faixa: 'adulto', fala: 'Eu opero as turbinas desta usina. Tenho um desafio técnico para você.' },
+      { nome: 'Mel', papel: 'Estudante', g: 'F', faixa: 'jovem', fala: 'Eu quero ser geógrafa! Me ajuda nessa questão sobre rios e energia?' },
+      { nome: 'Dona Benedita', papel: 'Ribeirinha e artesã', g: 'F', faixa: 'idoso', fala: 'Moro na beira do rio desde menina e vi a água subir quando fizeram a barragem. Tenho uma pergunta para você.' },
+      { nome: 'Renan', papel: 'Guia de canoagem', g: 'M', faixa: 'jovem', fala: 'Levo turistas para remar no reservatório. Quer encarar um desafio?' },
     ],
     lotes: [
-      { id: 'barragem', rotulo: 'Barragem existente', fp: [1, 1], opcoes: ['escadaPeixes'] },
-      { id: 'corredeira', rotulo: 'Corredeira do vale', fp: [1, 1], opcoes: ['pch', 'grandeBarragem'] },
-      { id: 'represa', rotulo: 'Reservatório', fp: [2, 2], agua: true, opcoes: ['solarFlutuante'] },
-      { id: 'encosta', rotulo: 'Encosta com desnível', fp: [2, 2], opcoes: ['usinaReversivel', 'termeletricaOleo'] },
-      { id: 'vila', rotulo: 'Praça da vila ribeirinha', fp: [1, 1], opcoes: ['centroComunitario', 'geradorDiesel'] },
+      { id: 'barragem', rotulo: 'Barragem existente', fp: [1, 1], opcoes: ['escadaPeixes', 'repotenciacao', 'monitorRio'] },
+      { id: 'corredeira', rotulo: 'Corredeira do vale', fp: [1, 1], opcoes: ['pch', 'grandeBarragem', 'hidrocinetica', 'ecoturismo'] },
+      { id: 'represa', rotulo: 'Reservatório', fp: [2, 2], agua: true, opcoes: ['solarFlutuante', 'barcoSolar'] },
+      { id: 'encosta', rotulo: 'Encosta com desnível', fp: [2, 2], opcoes: ['usinaReversivel', 'termeletricaOleo', 'usinaSolar', 'reflorestamento'] },
+      { id: 'vila', rotulo: 'Praça da vila ribeirinha', fp: [1, 1], opcoes: ['centroComunitario', 'geradorDiesel', 'casaSolar', 'biodigestor'] },
+      { id: 'hibrido', rotulo: 'Encosta acima do reservatório', fp: [2, 2], opcoes: ['hidroSolar', 'reversivelSolar'] },
     ],
     problemas: [
       { id: 'margens', nome: 'Margens desmatadas e rio assoreado', spr: 'toco', desc: 'Sem a mata ciliar, a chuva leva terra para o rio, que fica raso e barrento.', impactos: ['Assoreamento do rio', 'Menos água no reservatório', 'Peixes sem abrigo'], acao: { rotulo: 'Replantar a mata ciliar com a comunidade', custo: 100, ef: { agua: 18, bio: 14, co2: -10 } }, plantar: true, fala: 'As mudas nativas já seguram o solo. Em poucos anos, o rio estará protegido.' },
@@ -282,18 +418,21 @@
     conclusao: ['O mar está limpo de novo, e as marés agora iluminam a cidade.', 'Você ganhou a insígnia Força das Marés!'],
     demanda: 28, base: { energia: 0, co2: 88, agua: 40, bio: 42, social: 45 },
     npcs: [
-      { nome: 'Dona Lurdes', papel: 'Marisqueira', voz: 'mulherB', fala: 'Eu tiro meu sustento do mangue. Me ajude a entender esse mar!' },
-      { nome: 'Jonas', papel: 'Surfista e salva-vidas', voz: 'jovemM', fala: 'Conheço cada onda desta praia. Topa um desafio sobre o mar?' },
-      { nome: 'Capitão Nilo', papel: 'Comandante do porto', voz: 'homemB', fala: 'Navio que entra aqui depende da maré. Responda esta, marinheiro!' },
-      { nome: 'Bia', papel: 'Mergulhadora', voz: 'mulherA', fala: 'Eu vi o óleo no fundo do mar. Precisamos de pessoas que entendam o problema.' },
+      { nome: 'Dona Lurdes', papel: 'Marisqueira', g: 'F', faixa: 'idoso', fala: 'Eu tiro meu sustento do mangue. Me ajude a entender esse mar!' },
+      { nome: 'Jonas', papel: 'Surfista e salva-vidas', g: 'M', faixa: 'jovem', fala: 'Conheço cada onda desta praia. Topa um desafio sobre o mar?' },
+      { nome: 'Capitão Nilo', papel: 'Comandante do porto', g: 'M', faixa: 'idoso', fala: 'Navio que entra aqui depende da maré. Responda esta, marinheiro!' },
+      { nome: 'Bia', papel: 'Mergulhadora', g: 'F', faixa: 'adulto', fala: 'Eu vi o óleo no fundo do mar. Precisamos de pessoas que entendam o problema.' },
+      { nome: 'Sandra', papel: 'Dona da pousada', g: 'F', faixa: 'adulto', fala: 'Minha pousada depende de praias limpas e de um mar saudável. Responda este desafio!' },
+      { nome: 'Marcos', papel: 'Pescador de lagosta', g: 'M', faixa: 'adulto', fala: 'Saio de barco toda madrugada, e as correntes aqui são fortes. Tenho uma pergunta para você.' },
     ],
     lotes: [
-      { id: 'baia', rotulo: 'Boca da baía (marés altas)', fp: [1, 1], agua: true, opcoes: ['barragemMare'] },
-      { id: 'canal', rotulo: 'Canal de correnteza', fp: [1, 1], agua: true, opcoes: ['turbinaMare'] },
-      { id: 'quebramar', rotulo: 'Mar de ondas fortes', fp: [1, 1], agua: true, opcoes: ['boiaOndas'] },
-      { id: 'mangue', rotulo: 'Entrada do manguezal', fp: [1, 1], opcoes: ['preservarMangue', 'barragemMareMangue'] },
-      { id: 'porto', rotulo: 'Cais do porto', fp: [1, 1], opcoes: ['eletrificarPorto', 'geradorDiesel'] },
-      { id: 'largo', rotulo: 'Mar aberto', fp: [1, 1], agua: true, opcoes: ['eolicaOffshore'] },
+      { id: 'baia', rotulo: 'Boca da baía (marés altas)', fp: [1, 1], agua: true, opcoes: ['barragemMare', 'turbinaMare'] },
+      { id: 'canal', rotulo: 'Canal de correnteza', fp: [1, 1], agua: true, opcoes: ['turbinaMare', 'barcoSolar'] },
+      { id: 'quebramar', rotulo: 'Mar de ondas fortes', fp: [1, 1], agua: true, opcoes: ['boiaOndas', 'eolicaOffshore'] },
+      { id: 'mangue', rotulo: 'Entrada do manguezal', fp: [1, 1], opcoes: ['preservarMangue', 'barragemMareMangue', 'viveiroMangue', 'carcinicultura'] },
+      { id: 'porto', rotulo: 'Cais do porto', fp: [1, 1], opcoes: ['eletrificarPorto', 'geradorDiesel', 'painelSolar', 'bateria'] },
+      { id: 'largo', rotulo: 'Mar aberto', fp: [1, 1], agua: true, opcoes: ['eolicaOffshore', 'boiaOndas'] },
+      { id: 'hibrido', rotulo: 'Retroárea do porto', fp: [2, 2], opcoes: ['portoSolar', 'eolicaCosteira'] },
     ],
     problemas: [
       { id: 'oleo', nome: 'Vazamento de petróleo da plataforma', spr: 'plataformaPetroleo', fp: [2, 2], sprResolvido: 'turbinaMare', desc: 'Uma plataforma antiga vaza óleo. As manchas atingem praias, peixes e aves.', impactos: ['Manchas de óleo nas praias', 'Morte de peixes e aves', 'Prejuízo à pesca e ao turismo'], acao: { rotulo: 'Conter o óleo e desativar a plataforma', custo: 120, requer: { cobertura: 0.5 }, ef: { co2: -38, bio: 14, social: 8 } }, limparOleo: true, fala: 'Barreiras de contenção recolheram o óleo e a plataforma foi desativada. O mar agradece!' },
@@ -327,18 +466,21 @@
     conclusao: ['O vapor da Terra agora move turbinas, aquece estufas e a velha usina a óleo foi desligada.', 'Você ganhou a insígnia Calor da Terra!'],
     demanda: 26, base: { energia: 0, co2: 88, agua: 45, bio: 45, social: 42 },
     npcs: [
-      { nome: 'Helga', papel: 'Engenheira de perfuração', voz: 'mulherA', fala: 'Eu perfuro poços até as rochas quentes. Quero ver se você entende o calor da Terra!' },
-      { nome: 'Seu Ari', papel: 'Agricultor da encosta', voz: 'homemB', fala: 'Às vezes sinto um cheiro estranho vindo das fontes. Me explique uma coisa.' },
-      { nome: 'Nina', papel: 'Guia de turismo', voz: 'jovem', fala: 'Eu levo turistas às fontes termais. Responda este desafio!' },
-      { nome: 'Otávio', papel: 'Técnico de segurança', voz: 'homemA', fala: 'Minha função é proteger a vila de riscos. Tenho uma pergunta importante.' },
+      { nome: 'Helga', papel: 'Engenheira de perfuração', g: 'F', faixa: 'adulto', fala: 'Eu perfuro poços até as rochas quentes. Quero ver se você entende o calor da Terra!' },
+      { nome: 'Seu Ari', papel: 'Agricultor da encosta', g: 'M', faixa: 'idoso', fala: 'Às vezes sinto um cheiro estranho vindo das fontes. Me explique uma coisa.' },
+      { nome: 'Nina', papel: 'Guia de turismo', g: 'F', faixa: 'jovem', fala: 'Eu levo turistas às fontes termais. Responda este desafio!' },
+      { nome: 'Otávio', papel: 'Técnico de segurança', g: 'M', faixa: 'adulto', fala: 'Minha função é proteger a vila de riscos. Tenho uma pergunta importante.' },
+      { nome: 'Dona Glória', papel: 'Dona da casa de chás', g: 'F', faixa: 'idoso', fala: 'Minha casa de chás fica perto das fontes quentes. Quero entender esse calor que vem da Terra.' },
+      { nome: 'Hugo', papel: 'Estudante de geologia', g: 'M', faixa: 'jovem', fala: 'Estou estudando as rochas deste vulcão para a faculdade. Me ajuda com esta pergunta?' },
     ],
     lotes: [
-      { id: 'campo', rotulo: 'Campo geotérmico estável', fp: [2, 2], opcoes: ['geotermica', 'termeletricaOleo'] },
-      { id: 'encosta', rotulo: 'Encosta instável do vulcão', fp: [2, 2], opcoes: ['geotermicaRisco', 'parque'] },
-      { id: 'poco', rotulo: 'Área de reinjeção', fp: [1, 1], opcoes: ['pocoReinjecao'] },
-      { id: 'estufa', rotulo: 'Horta da vila', fp: [1, 1], opcoes: ['estufaGeo', 'geradorDiesel'] },
-      { id: 'filtro', rotulo: 'Pátio ao lado da usina', fp: [1, 1], opcoes: ['filtroGas', 'estacaoSismica'] },
-      { id: 'fonte', rotulo: 'Fonte de água quente', fp: [1, 1], opcoes: ['termas', 'estacaoSismica'] },
+      { id: 'campo', rotulo: 'Campo geotérmico estável', fp: [2, 2], opcoes: ['geotermica', 'termeletricaOleo', 'geotermicaBinaria'] },
+      { id: 'encosta', rotulo: 'Encosta instável do vulcão', fp: [2, 2], opcoes: ['geotermicaRisco', 'parque', 'reflorestamento'] },
+      { id: 'poco', rotulo: 'Área de reinjeção', fp: [1, 1], opcoes: ['pocoReinjecao', 'descarteGeo'] },
+      { id: 'estufa', rotulo: 'Horta da vila', fp: [1, 1], opcoes: ['estufaGeo', 'geradorDiesel', 'secadorGeo', 'irrigacao'] },
+      { id: 'filtro', rotulo: 'Pátio ao lado da usina', fp: [1, 1], opcoes: ['filtroGas', 'estacaoSismica', 'subestacao'] },
+      { id: 'fonte', rotulo: 'Fonte de água quente', fp: [1, 1], opcoes: ['termas', 'estacaoSismica', 'redeCalor'] },
+      { id: 'hibrido', rotulo: 'Planície ao pé do vulcão', fp: [2, 2], opcoes: ['geoSolar', 'geoCascata'] },
     ],
     problemas: [
       { id: 'oleo', nome: 'Termelétrica a óleo combustível', spr: 'termeletrica', sprResolvido: 'termeletricaDesativada', fp: [2, 2], desc: 'A vila depende de uma usina que queima óleo combustível trazido de navio.', impactos: ['Emissão de CO₂ e fuligem', 'Risco de derramamento no transporte', 'Energia cara'], acao: { rotulo: 'Desligar a usina a óleo', custo: 80, requer: { cobertura: 0.6 }, ef: { co2: -42, social: 8, agua: 6 } }, fala: 'A usina a óleo foi desligada. Agora o calor da própria Terra mantém as luzes acesas.' },
@@ -372,25 +514,28 @@
     conclusao: ['O céu está limpo, a usina gera energia com o bagaço e o córrego voltou a ter peixe.', 'Você ganhou a insígnia Energia do Canavial!'],
     demanda: 26, base: { energia: 0, co2: 80, agua: 40, bio: 35, social: 42 },
     npcs: [
-      { nome: 'Dona Fátima', papel: 'Moradora da cidade', voz: 'mulherB', fala: 'Na época da queimada, meu neto vive tossindo. Me ajude com esta pergunta.' },
-      { nome: 'Jurandir', papel: 'Operador de colheitadeira', voz: 'homemB', fala: 'Eu dirijo a colheitadeira, que colhe sem fogo. Bora para o desafio?' },
-      { nome: 'Lara', papel: 'Química da usina', voz: 'mulherA', fala: 'Eu cuido do etanol e da vinhaça. Vamos ver se você entende de biomassa.' },
-      { nome: 'Miguel', papel: 'Filho de sitiante', voz: 'jovemM', fala: 'Meu pai cria gado e planta cana. Tenho uma dúvida para você!' },
+      { nome: 'Dona Fátima', papel: 'Moradora da cidade', g: 'F', faixa: 'idoso', fala: 'Na época da queimada, meu neto vive tossindo. Me ajude com esta pergunta.' },
+      { nome: 'Jurandir', papel: 'Operador de colheitadeira', g: 'M', faixa: 'adulto', fala: 'Eu dirijo a colheitadeira, que colhe sem fogo. Bora para o desafio?' },
+      { nome: 'Lara', papel: 'Química da usina', g: 'F', faixa: 'adulto', fala: 'Eu cuido do etanol e da vinhaça. Vamos ver se você entende de biomassa.' },
+      { nome: 'Miguel', papel: 'Filho de sitiante', g: 'M', faixa: 'jovem', fala: 'Meu pai cria gado e planta cana. Tenho uma dúvida para você!' },
+      { nome: 'Seu Valdir', papel: 'Cortador de cana aposentado', g: 'M', faixa: 'idoso', fala: 'Cortei cana a vida inteira, no meio da fumaça das queimadas. Hoje é diferente. Responda este desafio!' },
+      { nome: 'Paula', papel: 'Técnica do laboratório da usina', g: 'F', faixa: 'jovem', fala: 'Analiso o etanol e a vinhaça no laboratório da usina. Topa um desafio?' },
     ],
     lotes: [
-      { id: 'usina', rotulo: 'Pátio da usina sucroenergética', fp: [2, 2], opcoes: ['biomassa', 'termeletricaOleo'] },
-      { id: 'vinhaca', rotulo: 'Lagoa de vinhaça', fp: [1, 1], opcoes: ['biogasVinhaca', 'vinhacaRio'] },
-      { id: 'palha', rotulo: 'Galpão da palha', fp: [1, 1], opcoes: ['etanol2G'] },
-      { id: 'corrego', rotulo: 'Margem do córrego', fp: [1, 1], opcoes: ['mataCiliar', 'expandirCana'] },
-      { id: 'faixa', rotulo: 'Faixa entre os talhões', fp: [2, 2], opcoes: ['agrofloresta'] },
-      { id: 'curral', rotulo: 'Curral do sítio', fp: [1, 1], opcoes: ['biodigestor'] },
+      { id: 'usina', rotulo: 'Pátio da usina sucroenergética', fp: [2, 2], opcoes: ['biomassa', 'termeletricaOleo', 'biometano', 'termeletricaGas'] },
+      { id: 'vinhaca', rotulo: 'Lagoa de vinhaça', fp: [1, 1], opcoes: ['biogasVinhaca', 'vinhacaRio', 'fertirrigacao'] },
+      { id: 'palha', rotulo: 'Galpão da palha', fp: [1, 1], opcoes: ['etanol2G', 'palhaSolo'] },
+      { id: 'corrego', rotulo: 'Margem do córrego', fp: [1, 1], opcoes: ['mataCiliar', 'expandirCana', 'pulverizacaoAerea'] },
+      { id: 'faixa', rotulo: 'Faixa entre os talhões', fp: [2, 2], opcoes: ['agrofloresta', 'reflorestamento', 'maisCana'] },
+      { id: 'curral', rotulo: 'Curral do sítio', fp: [1, 1], opcoes: ['biodigestor', 'compostagem'] },
+      { id: 'hibrido', rotulo: 'Pátio de expansão da usina', fp: [2, 2], opcoes: ['canaHibrida', 'solarBateria'] },
     ],
     problemas: [
       { id: 'queima', nome: 'Queima da palha da cana', spr: 'queimada', desc: 'Parte do canavial é queimada antes da colheita manual. A fumaça e a fuligem invadem a cidade.', impactos: ['Doenças respiratórias', 'Morte de animais', 'Emissão de gases e fuligem'], acao: { rotulo: 'Adotar a colheita mecanizada sem fogo', custo: 110, ef: { co2: -30, social: 10, bio: 8 } }, apagarFogo: true, fala: 'Sem fogo! A palha agora fica no campo, protegendo o solo, ou vai para a usina virar energia.' },
     ],
     infos: [
       { titulo: 'Cogeração', texto: 'As usinas de cana queimam o bagaço em caldeiras. O vapor move turbinas, gera eletricidade para a própria usina e o excedente vai para a rede.' },
-      { titulo: 'Fim das queimadas em São Paulo', texto: 'Em São Paulo, a queima da palha foi eliminada aos poucos, com a colheita mecanizada. Isso melhorou a qualidade do ar nas cidades do interior.' },
+      { titulo: 'Queimadas em São Paulo', texto: 'Em São Paulo, a queima da palha da cana vem sendo eliminada com a colheita mecanizada. Isso tem melhorado a qualidade do ar nas cidades do interior.' },
     ],
     questoes: [
       q('O que é biomassa, como fonte de energia?', 'Matéria orgânica de plantas e animais usada para gerar energia.', ['Rochas metálicas retiradas de minas profundas no subsolo do país.', 'Água salgada aquecida pelo calor das correntes marinhas.', 'Gás de cozinha produzido a partir do petróleo da camada do pré-sal.'], 'Bagaço, palha, lenha de reflorestamento, esterco e restos de alimentos são exemplos de biomassa.'),
@@ -417,18 +562,21 @@
     conclusao: ['O lixão virou aterro sanitário com captação de biogás, e a cooperativa ganhou um galpão novo.', 'Você ganhou a insígnia Cidade Circular!'],
     demanda: 12, base: { energia: 2, co2: 85, agua: 38, bio: 42, social: 40 },
     npcs: [
-      { nome: 'Seu Zé Carlos', papel: 'Catador há vinte anos', voz: 'homemB', fala: 'Eu tiro meu sustento da reciclagem. Quero ver se você entende de resíduos.' },
-      { nome: 'Júlia', papel: 'Estudante de engenharia', voz: 'jovem', fala: 'Estou estudando o biogás dos aterros. Me ajuda com este desafio?' },
-      { nome: 'Dona Celina', papel: 'Vizinha do lixão', voz: 'mulherB', fala: 'O cheiro aqui é forte demais. Me explique uma coisa, por favor.' },
-      { nome: 'Rui', papel: 'Gerente de fábrica', voz: 'homemA', fala: 'Minha fábrica quer reduzir resíduos. Responda esta pergunta!' },
+      { nome: 'Seu Zé Carlos', papel: 'Catador há vinte anos', g: 'M', faixa: 'idoso', fala: 'Eu tiro meu sustento da reciclagem. Quero ver se você entende de resíduos.' },
+      { nome: 'Júlia', papel: 'Estudante de engenharia', g: 'F', faixa: 'jovem', fala: 'Estou estudando o biogás dos aterros. Me ajuda com este desafio?' },
+      { nome: 'Dona Celina', papel: 'Vizinha do lixão', g: 'F', faixa: 'idoso', fala: 'O cheiro aqui é forte demais. Me explique uma coisa, por favor.' },
+      { nome: 'Rui', papel: 'Gerente de fábrica', g: 'M', faixa: 'adulto', fala: 'Minha fábrica quer reduzir resíduos. Responda esta pergunta!' },
+      { nome: 'Marli', papel: 'Merendeira da escola', g: 'F', faixa: 'adulto', fala: 'Na cozinha da escola, as cascas viram adubo para a horta. Tenho uma pergunta para você.' },
+      { nome: 'Edson', papel: 'Motorista da coleta seletiva', g: 'M', faixa: 'adulto', fala: 'Dirijo o caminhão da coleta seletiva. Quer ver se você sabe separar o lixo?' },
     ],
     lotes: [
-      { id: 'galpao', rotulo: 'Terreno da cooperativa', fp: [2, 2], opcoes: ['reciclagem'] },
-      { id: 'gas', rotulo: 'Ao lado do aterro', fp: [1, 1], opcoes: ['usinaBiogasAterro', 'incinerador'] },
-      { id: 'praca', rotulo: 'Praça do bairro', fp: [1, 1], opcoes: ['ecoponto', 'compostagem'] },
-      { id: 'horta', rotulo: 'Horta comunitária', fp: [1, 1], opcoes: ['compostagem', 'ecoponto'] },
-      { id: 'industria', rotulo: 'Distrito industrial', fp: [1, 1], opcoes: ['logisticaReversa', 'incinerador'] },
-      { id: 'granja', rotulo: 'Granja de suínos', fp: [1, 1], opcoes: ['biodigestor'] },
+      { id: 'galpao', rotulo: 'Terreno da cooperativa', fp: [2, 2], opcoes: ['reciclagem', 'fabricaReciclados'] },
+      { id: 'gas', rotulo: 'Ao lado do aterro', fp: [1, 1], opcoes: ['usinaBiogasAterro', 'incinerador', 'queimadorMetano'] },
+      { id: 'praca', rotulo: 'Praça do bairro', fp: [1, 1], opcoes: ['ecoponto', 'compostagem', 'feiraTrocas'] },
+      { id: 'horta', rotulo: 'Horta comunitária', fp: [1, 1], opcoes: ['compostagem', 'ecoponto', 'irrigacao'] },
+      { id: 'industria', rotulo: 'Distrito industrial', fp: [1, 1], opcoes: ['logisticaReversa', 'incinerador', 'simbiose'] },
+      { id: 'granja', rotulo: 'Granja de suínos', fp: [1, 1], opcoes: ['biodigestor', 'lagoaDejetos'] },
+      { id: 'hibrido', rotulo: 'Célula encerrada do aterro', fp: [2, 2], opcoes: ['aterroSolar', 'ecoparque'] },
     ],
     problemas: [
       { id: 'lixao', nome: 'Lixão a céu aberto', spr: 'lixao', sprResolvido: 'aterro', fp: [2, 2], desc: 'Todo o lixo da cidade vai para um terreno sem proteção. Há fumaça, urubus, mau cheiro e chorume.', impactos: ['Chorume contamina solo e água', 'Metano escapa para o ar', 'Doenças e trabalho insalubre'], acao: { rotulo: 'Encerrar o lixão e construir aterro sanitário', custo: 180, ef: { co2: -30, agua: 18, social: 10, bio: 6 } }, fala: 'O lixão foi encerrado! O aterro sanitário tem manta impermeável, trata o chorume e capta os gases.' },
@@ -462,18 +610,21 @@
     conclusao: ['O fogo se apagou. As mudas crescem, a agrofloresta dá frutos e os rios voadores seguem levando chuva.', 'Você ganhou a insígnia Floresta Viva!'],
     demanda: 10, base: { energia: 2, co2: 85, agua: 40, bio: 30, social: 42 },
     npcs: [
-      { nome: 'Seu Raimundo', papel: 'Pecuarista', voz: 'homemB', fala: 'Meu pasto está fraco e pensei em abrir mais mata. Antes, me responda isso.' },
-      { nome: 'Kauê', papel: 'Brigadista florestal', voz: 'jovemM', fala: 'Eu combato incêndios na floresta. Tenho um desafio para você!' },
-      { nome: 'Dona Socorro', papel: 'Extrativista de castanha', voz: 'mulherB', fala: 'Eu vivo da castanha e do açaí. Me ajude a responder esta pergunta.' },
-      { nome: 'Lúcia', papel: 'Pesquisadora do clima', voz: 'mulherA', fala: 'Eu estudo como a floresta influencia as chuvas. Vamos ao desafio!' },
+      { nome: 'Seu Raimundo', papel: 'Pecuarista', g: 'M', faixa: 'idoso', fala: 'Meu pasto está fraco e pensei em abrir mais mata. Antes, me responda isso.' },
+      { nome: 'Kauê', papel: 'Brigadista florestal', g: 'M', faixa: 'jovem', fala: 'Eu combato incêndios na floresta. Tenho um desafio para você!' },
+      { nome: 'Dona Socorro', papel: 'Extrativista de castanha', g: 'F', faixa: 'idoso', fala: 'Eu vivo da castanha e do açaí. Me ajude a responder esta pergunta.' },
+      { nome: 'Lúcia', papel: 'Pesquisadora do clima', g: 'F', faixa: 'adulto', fala: 'Eu estudo como a floresta influencia as chuvas. Vamos ao desafio!' },
+      { nome: 'Potira', papel: 'Estudante indígena', g: 'F', faixa: 'jovem', fala: 'Aprendi com minha avó a cuidar das sementes da floresta. Responda este desafio!' },
+      { nome: 'Seu Cícero', papel: 'Seringueiro', g: 'M', faixa: 'idoso', fala: 'Tiro o látex das seringueiras sem derrubar nenhuma árvore. Tenho uma pergunta para você.' },
     ],
     lotes: [
-      { id: 'queimada', rotulo: 'Área queimada', fp: [2, 2], opcoes: ['reflorestamento', 'pastoExtensivo'] },
-      { id: 'pasto', rotulo: 'Pasto degradado', fp: [2, 2], opcoes: ['agrofloresta', 'pastoExtensivo'] },
-      { id: 'margem', rotulo: 'Margem do igarapé', fp: [1, 1], opcoes: ['mataCiliar'] },
-      { id: 'viveiro', rotulo: 'Terreno da comunidade', fp: [1, 1], opcoes: ['viveiro'] },
-      { id: 'clareira', rotulo: 'Clareira da vila', fp: [1, 1], opcoes: ['painelSolar', 'geradorDiesel'] },
-      { id: 'curral', rotulo: 'Curral da fazenda', fp: [1, 1], opcoes: ['biodigestor'] },
+      { id: 'queimada', rotulo: 'Área queimada', fp: [2, 2], opcoes: ['reflorestamento', 'pastoExtensivo', 'regeneracao', 'agrofloresta', 'monocultura'] },
+      { id: 'pasto', rotulo: 'Pasto degradado', fp: [2, 2], opcoes: ['agrofloresta', 'pastoExtensivo', 'ilpf', 'reflorestamento'] },
+      { id: 'margem', rotulo: 'Margem do igarapé', fp: [1, 1], opcoes: ['mataCiliar', 'gadoIgarape'] },
+      { id: 'viveiro', rotulo: 'Terreno da comunidade', fp: [1, 1], opcoes: ['viveiro', 'agroindustria'] },
+      { id: 'clareira', rotulo: 'Clareira da vila', fp: [1, 1], opcoes: ['painelSolar', 'geradorDiesel', 'bateria', 'centroComunitario'] },
+      { id: 'curral', rotulo: 'Curral da fazenda', fp: [1, 1], opcoes: ['biodigestor', 'compostagem'] },
+      { id: 'hibrido', rotulo: 'Clareira da aldeia', fp: [2, 2], opcoes: ['miniusina', 'escolaAldeia', 'geradorDiesel'] },
     ],
     problemas: [
       { id: 'fogo', nome: 'Queimada para abrir pasto', spr: 'queimada', desc: 'Fogo ateado na mata para abrir pastagem. As chamas avançam sobre a floresta.', impactos: ['Libera carbono das árvores', 'Fumaça e doenças respiratórias', 'Morte de animais e perda de solo'], acao: { rotulo: 'Acionar a brigada e combater o fogo', custo: 90, ef: { co2: -32, bio: 12, social: 6 } }, apagarFogo: true, fala: 'A brigada controlou o fogo! Agora é hora de recuperar o que foi queimado.' },
@@ -507,18 +658,21 @@
     conclusao: ['A barragem perigosa foi desativada, o rio está sendo tratado e a reciclagem reduz a pressão sobre o vale.', 'Você ganhou a insígnia Mineração Responsável!'],
     demanda: 16, base: { energia: 2, co2: 72, agua: 36, bio: 38, social: 38 },
     npcs: [
-      { nome: 'Seu Geraldo', papel: 'Morador abaixo da barragem', voz: 'homemB', fala: 'Moro abaixo da barragem e tenho medo. Me ajude a entender os riscos.' },
-      { nome: 'Patrícia', papel: 'Fiscal ambiental', voz: 'mulherA', fala: 'Eu fiscalizo as licenças da mineradora. Responda este desafio!' },
-      { nome: 'Leo', papel: 'Técnico em eletrônica', voz: 'jovemM', fala: 'Dentro de um celular velho tem muito metal valioso. Sabia? Bora testar!' },
-      { nome: 'Dona Zilda', papel: 'Agricultora do vale', voz: 'mulherB', fala: 'Minha horta depende da água do rio. Me responda, por favor.' },
+      { nome: 'Seu Geraldo', papel: 'Morador abaixo da barragem', g: 'M', faixa: 'idoso', fala: 'Moro abaixo da barragem e tenho medo. Me ajude a entender os riscos.' },
+      { nome: 'Patrícia', papel: 'Fiscal ambiental', g: 'F', faixa: 'adulto', fala: 'Eu fiscalizo as licenças da mineradora. Responda este desafio!' },
+      { nome: 'Leo', papel: 'Técnico em eletrônica', g: 'M', faixa: 'jovem', fala: 'Dentro de um celular velho tem muito metal valioso. Sabia? Bora testar!' },
+      { nome: 'Dona Zilda', papel: 'Agricultora do vale', g: 'F', faixa: 'idoso', fala: 'Minha horta depende da água do rio. Me responda, por favor.' },
+      { nome: 'Rita', papel: 'Engenheira de segurança de barragens', g: 'F', faixa: 'adulto', fala: 'Fiscalizo barragens todos os dias, e segurança vem em primeiro lugar. Responda este desafio!' },
+      { nome: 'Wagner', papel: 'Operador de máquinas da mina', g: 'M', faixa: 'adulto', fala: 'Trabalho na mina há quinze anos. Quero ver se você entende de mineração.' },
     ],
     lotes: [
-      { id: 'cava', rotulo: 'Cava abandonada', fp: [2, 2], opcoes: ['recuperarMina', 'novaCava'] },
-      { id: 'eletronicos', rotulo: 'Galpão na entrada da cidade', fp: [1, 1], opcoes: ['reciclaEletronicos'] },
-      { id: 'agua', rotulo: 'Saída de água da mina', fp: [1, 1], opcoes: ['eta'] },
-      { id: 'patio', rotulo: 'Pátio da mineradora', fp: [1, 1], opcoes: ['painelSolar', 'geradorDiesel'] },
-      { id: 'morro', rotulo: 'Morro ventoso', fp: [1, 1], opcoes: ['eolicaSemImas', 'torreEolica'] },
-      { id: 'vila', rotulo: 'Centro da vila mineira', fp: [1, 1], opcoes: ['centroComunitario'] },
+      { id: 'cava', rotulo: 'Cava abandonada', fp: [2, 2], opcoes: ['recuperarMina', 'novaCava', 'solarCava'] },
+      { id: 'eletronicos', rotulo: 'Galpão na entrada da cidade', fp: [1, 1], opcoes: ['reciclaEletronicos', 'logisticaReversa'] },
+      { id: 'agua', rotulo: 'Saída de água da mina', fp: [1, 1], opcoes: ['eta', 'mataCiliar', 'despejoMina'] },
+      { id: 'patio', rotulo: 'Pátio da mineradora', fp: [1, 1], opcoes: ['painelSolar', 'geradorDiesel', 'bateria', 'caminhaoEletrico'] },
+      { id: 'morro', rotulo: 'Morro ventoso', fp: [1, 1], opcoes: ['eolicaSemImas', 'torreEolica', 'painelSolar'] },
+      { id: 'vila', rotulo: 'Centro da vila mineira', fp: [1, 1], opcoes: ['centroComunitario', 'casaSolar', 'ecoponto'] },
+      { id: 'hibrido', rotulo: 'Platô ao lado da mina', fp: [2, 2], opcoes: ['minaHibrida', 'h2Mina'] },
     ],
     problemas: [
       { id: 'barragem', nome: 'Barragem de rejeitos em risco', spr: 'lagoRejeito', fp: [2, 2], sprResolvido: 'pilhaSeca', desc: 'Uma barragem antiga guarda lama de rejeitos de mineração acima da vila.', impactos: ['Risco de rompimento', 'Contaminação do rio', 'Ameaça à vida dos moradores'], acao: { rotulo: 'Descaracterizar a barragem e empilhar a seco', custo: 200, ef: { social: 16, agua: 14, bio: 6, co2: -18 } }, fala: 'A lama foi drenada e os rejeitos secos foram empilhados com segurança. A vila pode dormir tranquila.' },
@@ -552,18 +706,21 @@
     conclusao: ['Agora a nuvem é verde: energia renovável, água reaproveitada e calor que aquece a comunidade.', 'Você ganhou a insígnia Dados Verdes!'],
     demanda: 24, base: { energia: 0, co2: 90, agua: 38, bio: 50, social: 38 },
     npcs: [
-      { nome: 'Sofia', papel: 'Gamer e youtuber', voz: 'jovem', fala: 'Eu passo o dia na internet e nunca pensei na energia que ela gasta. Me ajuda?' },
-      { nome: 'Seu Osvaldo', papel: 'Vizinho do data center', voz: 'homemB', fala: 'O zumbido dos ventiladores não me deixa dormir. Responda este desafio.' },
-      { nome: 'Renata', papel: 'Gestora da companhia de água', voz: 'mulherA', fala: 'A cidade passa por estiagem. Quero saber se você entende o problema.' },
-      { nome: 'Igor', papel: 'Técnico de servidores', voz: 'homemA', fala: 'Eu cuido dos servidores lá dentro. Vamos a um desafio técnico!' },
+      { nome: 'Sofia', papel: 'Gamer e youtuber', g: 'F', faixa: 'jovem', fala: 'Eu passo o dia na internet e nunca pensei na energia que ela gasta. Me ajuda?' },
+      { nome: 'Seu Osvaldo', papel: 'Vizinho do data center', g: 'M', faixa: 'idoso', fala: 'O zumbido dos ventiladores não me deixa dormir. Responda este desafio.' },
+      { nome: 'Renata', papel: 'Gestora da companhia de água', g: 'F', faixa: 'adulto', fala: 'A cidade passa por estiagem. Quero saber se você entende o problema.' },
+      { nome: 'Igor', papel: 'Técnico de servidores', g: 'M', faixa: 'adulto', fala: 'Eu cuido dos servidores lá dentro. Vamos a um desafio técnico!' },
+      { nome: 'Carla', papel: 'Professora de informática', g: 'F', faixa: 'adulto', fala: 'Ensino programação para os jovens do bairro. Você sabe quanta energia a internet gasta?' },
+      { nome: 'Bruno', papel: 'Estudante de inteligência artificial', g: 'M', faixa: 'jovem', fala: 'Treino modelos de inteligência artificial para o meu projeto. Topa um desafio?' },
     ],
     lotes: [
-      { id: 'solar', rotulo: 'Terreno para energia própria', fp: [2, 2], opcoes: ['usinaSolar', 'termeletricaGas'] },
-      { id: 'vento', rotulo: 'Colina ventosa', fp: [1, 1], opcoes: ['torreEolica'] },
-      { id: 'resfria', rotulo: 'Central de resfriamento', fp: [1, 1], opcoes: ['resfriamentoReuso', 'resfriamentoPotavel'] },
-      { id: 'barreira', rotulo: 'Divisa com o bairro', fp: [1, 1], opcoes: ['muroAcustico', 'cinturaoVerde'] },
-      { id: 'calor', rotulo: 'Terreno ao lado da escola', fp: [1, 1], opcoes: ['estufaCalor'] },
-      { id: 'pátio', rotulo: 'Pátio técnico', fp: [1, 1], opcoes: ['bateria', 'geradorDiesel'] },
+      { id: 'solar', rotulo: 'Terreno para energia própria', fp: [2, 2], opcoes: ['usinaSolar', 'termeletricaGas', 'painelSolar', 'reatorModular'] },
+      { id: 'vento', rotulo: 'Colina ventosa', fp: [1, 1], opcoes: ['torreEolica', 'eolicaSemImas', 'painelSolar'] },
+      { id: 'resfria', rotulo: 'Central de resfriamento', fp: [1, 1], opcoes: ['resfriamentoReuso', 'resfriamentoPotavel', 'resfriamentoLiquido'] },
+      { id: 'barreira', rotulo: 'Divisa com o bairro', fp: [1, 1], opcoes: ['muroAcustico', 'cinturaoVerde', 'pracaPublica'] },
+      { id: 'calor', rotulo: 'Terreno ao lado da escola', fp: [1, 1], opcoes: ['estufaCalor', 'calorCasas'] },
+      { id: 'pátio', rotulo: 'Pátio técnico', fp: [1, 1], opcoes: ['bateria', 'geradorDiesel', 'celulaCombustivel'] },
+      { id: 'hibrido', rotulo: 'Campus de energia do data center', fp: [2, 2], opcoes: ['dcHibrido', 'solarBateria'] },
     ],
     problemas: [
       { id: 'diesel', nome: 'Geradores a diesel do data center', spr: 'geradorDiesel', sprResolvido: 'bateria', desc: 'Os geradores de emergência são ligados em testes e nas falhas da rede, queimando diesel.', impactos: ['Emissão de CO₂ e fuligem', 'Ruído constante', 'Dependência de combustível fóssil'], acao: { rotulo: 'Trocar os geradores por baterias', custo: 100, requer: { cobertura: 0.5 }, ef: { co2: -38, social: 10 } }, fala: 'Os geradores a diesel saíram de cena. Baterias carregadas com energia renovável garantem a segurança.' },
@@ -599,21 +756,24 @@
     demanda: 30, base: { energia: 8, co2: 95, agua: 45, bio: 45, social: 45 },
     existentes: [{ perfil: 'hidro', cap: 8, nome: 'Hidrelétrica existente', energiaDia: 110 }],
     npcs: [
-      { nome: 'Prefeita Helena', papel: 'Prefeita de Vale Esperança', voz: 'mulherB', fala: 'Prometi energia limpa para a cidade. Antes de assinar o plano, responda isto.' },
-      { nome: 'Dr. Paulo', papel: 'Físico nuclear', voz: 'homemB', fala: 'Trabalho na usina nuclear há trinta anos. Vamos conversar sobre os prós e contras?' },
-      { nome: 'Camila', papel: 'Engenheira de redes', voz: 'mulherA', fala: 'Minha especialidade é ligar tudo com tudo. Topa um desafio sobre a rede?' },
-      { nome: 'Davi', papel: 'Estudante e cientista mirim', voz: 'jovemM', fala: 'Eu fiz um projeto sobre hidrogênio verde na feira de ciências! Me responde essa?' },
+      { nome: 'Prefeita Helena', papel: 'Prefeita de Vale Esperança', g: 'F', faixa: 'adulto', fala: 'Prometi energia limpa para a cidade. Antes de assinar o plano, responda isto.' },
+      { nome: 'Dr. Paulo', papel: 'Físico nuclear', g: 'M', faixa: 'idoso', fala: 'Trabalho na usina nuclear há trinta anos. Vamos conversar sobre os prós e contras?' },
+      { nome: 'Camila', papel: 'Engenheira de redes', g: 'F', faixa: 'adulto', fala: 'Minha especialidade é ligar tudo com tudo. Topa um desafio sobre a rede?' },
+      { nome: 'Davi', papel: 'Estudante e cientista mirim', g: 'M', faixa: 'jovem', fala: 'Eu fiz um projeto sobre hidrogênio verde na feira de ciências! Me responde essa?' },
+      { nome: 'Seu Gilberto', papel: 'Comerciante do centro', g: 'M', faixa: 'idoso', fala: 'Meu mercado fica aberto até tarde. Preciso de energia limpa também à noite. Responda este desafio!' },
+      { nome: 'Larissa', papel: 'Técnica em eletrotécnica', g: 'F', faixa: 'jovem', fala: 'Estou aprendendo a operar a rede inteligente da cidade. Tenho uma pergunta para você.' },
     ],
     lotes: [
-      { id: 'solar', rotulo: 'Campo solar', fp: [2, 2], opcoes: ['usinaSolar', 'termeletricaGas'] },
-      { id: 'vento1', rotulo: 'Serra ventosa (A)', fp: [1, 1], opcoes: ['torreEolica'] },
-      { id: 'vento2', rotulo: 'Serra ventosa (B)', fp: [1, 1], opcoes: ['torreEolica'] },
-      { id: 'mar', rotulo: 'Canal de maré', fp: [1, 1], agua: true, opcoes: ['turbinaMare', 'eolicaOffshore'] },
-      { id: 'reversivel', rotulo: 'Desnível da serra', fp: [2, 2], opcoes: ['usinaReversivel'] },
-      { id: 'bateria', rotulo: 'Pátio da subestação', fp: [1, 1], opcoes: ['bateria', 'geradorDiesel'] },
-      { id: 'biogas', rotulo: 'Ao lado do aterro', fp: [1, 1], opcoes: ['usinaBiogas'] },
-      { id: 'controle', rotulo: 'Centro da cidade', fp: [1, 1], opcoes: ['redeInteligente'] },
-      { id: 'h2', rotulo: 'Distrito industrial', fp: [1, 1], opcoes: ['hidrogenio'] },
+      { id: 'solar', rotulo: 'Campo solar', fp: [2, 2], opcoes: ['usinaSolar', 'termeletricaGas', 'biomassa'] },
+      { id: 'vento1', rotulo: 'Serra ventosa (A)', fp: [1, 1], opcoes: ['torreEolica', 'eolicaSemImas'] },
+      { id: 'vento2', rotulo: 'Serra ventosa (B)', fp: [1, 1], opcoes: ['torreEolica', 'eolicaSemImas', 'painelSolar'] },
+      { id: 'mar', rotulo: 'Canal de maré', fp: [1, 1], agua: true, opcoes: ['turbinaMare', 'eolicaOffshore', 'boiaOndas'] },
+      { id: 'reversivel', rotulo: 'Desnível da serra', fp: [2, 2], opcoes: ['usinaReversivel', 'usinaSolar', 'grandeBarragem'] },
+      { id: 'bateria', rotulo: 'Pátio da subestação', fp: [1, 1], opcoes: ['bateria', 'geradorDiesel', 'subestacao'] },
+      { id: 'biogas', rotulo: 'Ao lado do aterro', fp: [1, 1], opcoes: ['usinaBiogas', 'biodigestor', 'incinerador'] },
+      { id: 'controle', rotulo: 'Centro da cidade', fp: [1, 1], opcoes: ['redeInteligente', 'prediosEficientes'] },
+      { id: 'h2', rotulo: 'Distrito industrial', fp: [1, 1], opcoes: ['hidrogenio', 'bateria'] },
+      { id: 'hibrido', rotulo: 'Polo de armazenamento da rede', fp: [2, 2], opcoes: ['redeHibrida', 'solarH2'] },
     ],
     problemas: [
       { id: 'carvao', nome: 'Termelétrica a carvão', spr: 'termeletrica', sprResolvido: 'termeletricaDesativada', fp: [2, 2], desc: 'A maior fonte de emissões da cidade. Só pode ser desligada quando a energia limpa atender as 24 horas.', impactos: ['Gás carbônico e fuligem', 'Chuva ácida', 'Poluição térmica no rio'], acao: { rotulo: 'Aposentar a termelétrica a carvão', custo: 60, requer: { horas24: true }, ef: { co2: -45, agua: 8, social: 6 } }, fala: 'A termelétrica a carvão foi aposentada. O ar da cidade nunca esteve tão limpo!' },
@@ -635,6 +795,118 @@
       q('O que significa eficiência energética?', 'Fazer o mesmo trabalho gastando menos energia.', ['Gastar mais energia para que os aparelhos durem mais.', 'Produzir energia apenas com combustíveis importados.', 'Deixar os aparelhos ligados para não desgastar botões.'], 'Lâmpadas LED, aparelhos com selo Procel e bons hábitos reduzem o consumo e a necessidade de novas usinas.'),
       q('Qual é o principal gás responsável pela intensificação do efeito estufa?', 'O gás carbônico, liberado sobretudo pela queima de fósseis.', ['O gás oxigênio, liberado sobretudo pelas florestas tropicais.', 'O gás nitrogênio, liberado sobretudo pelas ondas do mar.', 'O gás hélio, liberado sobretudo pelas usinas eólicas.'], 'O excesso de gás carbônico retém mais calor na atmosfera e aquece o planeta.'),
     ],
+  });
+
+  // ---------- soluções alternativas para os problemas ----------
+  // A primeira solução é a original (acao). As alternativas também resolvem o problema,
+  // mas com custos, requisitos e efeitos diferentes; algumas pedem atenção.
+  const SOLUCOES = {
+    'solar/diesel': { ic: ['bateria', 'ok'], spr: 'bancoBaterias', alt: [
+      { rotulo: 'Trocar o diesel por biodiesel', tipo: 'atencao', custo: 40, ef: { co2: -12, social: 2 }, spr: 'geradorBiodiesel', ic: ['fumaca', 'folha'], desc: 'Reduz parte das emissões, mas o gerador continua queimando combustível e fazendo barulho.', fala: 'O biodiesel ajudou um pouco, mas o motor continua ligado e barulhento. O ideal é a energia solar com baterias.' },
+      { rotulo: 'Ligar o bairro a uma microrrede solar', custo: 110, requer: { cobertura: 0.4 }, ef: { co2: -38, social: 10 }, spr: 'painelBateria', ic: ['casa', 'rede'], desc: 'Painéis nos telhados e baterias compartilhadas substituem o gerador, e os vizinhos dividem a energia.', fala: 'O bairro agora gera, guarda e divide a própria energia. Silêncio e ar limpo!' },
+    ] },
+    'eolica/carvao': { ic: ['fumaca', 'proibido'], spr: 'museuEnergia', alt: [
+      { rotulo: 'Converter a caldeira para biomassa de manejo', tipo: 'atencao', custo: 120, requer: { cobertura: 0.4 }, ef: { co2: -28, agua: 3, social: 4 }, spr: 'termeletricaBiomassa', ic: ['chama', 'arvore'], desc: 'A usina passa a queimar resíduos de madeira de manejo. Emite bem menos, mas ainda solta fumaça.', fala: 'A usina agora queima resíduos de madeira de manejo. Emite bem menos, mas a madeira precisa vir de florestas plantadas e bem cuidadas.' },
+      { rotulo: 'Desmontar a usina e guardar a energia dos ventos em baterias', custo: 140, requer: { cobertura: 0.6 }, ef: { co2: -45, agua: 8, social: 6 }, spr: 'patioBaterias', ic: ['bateria', 'vento'], desc: 'O terreno e a linha de transmissão da antiga usina passam a guardar a energia dos aerogeradores.', fala: 'A chaminé foi desmontada. O terreno virou um grande banco de baterias que guarda a energia dos ventos.' },
+    ] },
+    'hidro/margens': { ic: ['arvore', 'ok'], spr: 'mudasMargem', alt: [
+      { rotulo: 'Cercar as margens para a mata voltar sozinha', custo: 50, ef: { agua: 10, bio: 10, co2: -6 }, spr: 'cercaMargem', ic: ['cerca', 'gota'], desc: 'Sem gado e sem fogo, as sementes brotam sozinhas. Custa pouco, mas leva mais tempo.', fala: 'Sem gado e sem fogo, a mata volta sozinha, mais devagar. Em alguns anos as margens estarão protegidas.' },
+      { rotulo: 'Agrofloresta nas margens com as famílias ribeirinhas', custo: 120, ef: { agua: 16, bio: 12, co2: -10, social: 8 }, spr: 'agroMargem', ic: ['arvore', 'moeda'], desc: 'Árvores nativas, frutas e madeira juntas protegem o rio e geram renda.', fala: 'Frutas, madeira e mata nativa juntas: a margem protege o rio e ainda gera renda para as famílias.' },
+    ] },
+    'mare/oleo': { ic: ['onda', 'ok'], spr: 'plataformaContida', alt: [
+      { rotulo: 'Conter o óleo e apoiar um aerogerador na base', custo: 170, requer: { cobertura: 0.5 }, ef: { co2: -40, bio: 12, social: 8 }, spr: 'plataformaEolica', ic: ['onda', 'vento'], desc: 'A estrutura reforçada da plataforma passa a sustentar um aerogerador no mar.', fala: 'O óleo foi recolhido, e a antiga plataforma agora sustenta um aerogerador no mar.' },
+      { rotulo: 'Conter o óleo e transformar a base em recife artificial', custo: 140, requer: { cobertura: 0.5 }, ef: { co2: -35, bio: 20, social: 6 }, spr: 'recifeArtificial', ic: ['peixe', 'ok'], desc: 'A parte de cima é desmontada, e a base submersa vira abrigo para peixes e corais.', fala: 'A plataforma foi desmontada, e a base submersa virou abrigo para peixes e corais.' },
+    ] },
+    'geo/oleo': { ic: ['chama', 'proibido'], spr: 'termeletricaDesativada', alt: [
+      { rotulo: 'Usar biodiesel de óleo de cozinha usado', tipo: 'atencao', custo: 60, ef: { co2: -15, social: 4 }, spr: 'termeletricaBiodiesel', ic: ['chama', 'ciclo'], desc: 'Aproveita um resíduo e reduz parte das emissões, mas a usina continua queimando combustível.', fala: 'O óleo de cozinha virou combustível e as emissões caíram um pouco. Mas a energia limpa da Terra é o melhor caminho.' },
+      { rotulo: 'Converter a usina para vapor geotérmico', custo: 200, requer: { cobertura: 0.4 }, ef: { co2: -44, social: 6, agua: 4 }, spr: 'usinaConvertidaGeo', ic: ['monte', 'chave'], desc: 'As turbinas passam a girar com vapor do subsolo, aproveitando o prédio e a linha de transmissão.', fala: 'As antigas turbinas agora giram com o vapor do vulcão. O prédio ganhou uma nova vida, sem queimar óleo.' },
+    ] },
+    'cana/queima': { ic: ['plantacao', 'ok'], spr: 'colheitadeira', alt: [
+      { rotulo: 'Recolher a palha para gerar energia e etanol', custo: 130, ef: { co2: -32, social: 8, bio: 6, agua: 2 }, spr: 'fardosPalha', ic: ['plantacao', 'raio'], desc: 'Sem fogo, a palha é enfardada e vai para as caldeiras e para o etanol de segunda geração.', fala: 'Sem fogo! A palha virou fardos que vão para as caldeiras e para o etanol de segunda geração.' },
+      { rotulo: 'Colher a cana crua à mão, com proteção ao trabalhador', tipo: 'atencao', custo: 90, ef: { co2: -26, social: 4, bio: 6 }, spr: 'colheitaManual', ic: ['pessoa', 'plantacao'], desc: 'Acaba o fogo e mantém empregos, mas o corte manual é pesado e exige pausas e proteção.', fala: 'Sem fogo, o corte manual ficou mais seguro. Mas o trabalho é pesado e precisa de pausas, água e equipamentos de proteção.' },
+    ] },
+    'residuos/lixao': { ic: ['lixo', 'ok'], spr: 'aterro', alt: [
+      { rotulo: 'Encerrar o lixão e abrir uma central de triagem e compostagem', custo: 220, ef: { co2: -32, agua: 16, social: 14, bio: 6 }, spr: 'centralTriagem', ic: ['lixo', 'pessoa'], desc: 'Os recicláveis vão para a cooperativa, os restos orgânicos viram adubo, e só o rejeito vai para o aterro.', fala: 'O lixão foi fechado. Agora a cidade separa, recicla e composta, e quase nada vai para o aterro.' },
+      { rotulo: 'Remediar o lixão e transformar a área em parque', custo: 250, ef: { co2: -28, agua: 20, social: 12, bio: 10 }, spr: 'parqueRecuperado', ic: ['arvore', 'lixo'], desc: 'O terreno é coberto, o chorume é tratado e o gás é drenado. Em cima, nasce um parque.', fala: 'O antigo lixão virou parque. O chorume é tratado e o gás é drenado com segurança por baixo da grama.' },
+    ] },
+    'floresta/fogo': { ic: ['chama', 'pessoa'], spr: 'brigada', alt: [
+      { rotulo: 'Abrir aceiros e criar uma brigada comunitária', custo: 70, ef: { co2: -28, bio: 10, social: 10 }, spr: 'aceiro', ic: ['cerca', 'chama'], desc: 'Faixas sem vegetação seguram o fogo, e moradores treinados vigiam a mata.', fala: 'Os aceiros seguraram o fogo, e a brigada da comunidade está de prontidão.' },
+      { rotulo: 'Vigiar focos de calor por satélite e torre de vigia', custo: 120, ef: { co2: -34, bio: 14, social: 6 }, spr: 'torreVigia', ic: ['antena', 'chama'], desc: 'Alertas de satélite e uma torre de vigia avisam a brigada nos primeiros minutos do incêndio.', fala: 'O satélite avisou e a brigada chegou rápido. O fogo foi apagado ainda pequeno.' },
+    ] },
+    'mineracao/barragem': { ic: ['monte', 'ok'], spr: 'pilhaSeca', alt: [
+      { rotulo: 'Reforçar a barragem e instalar sirenes', tipo: 'atencao', custo: 120, ef: { social: 8, agua: 4, bio: 2, co2: -6 }, spr: 'barragemReforcada', ic: ['som', 'alerta'], desc: 'Diminui o risco por um tempo, mas a barragem a montante continua lá, e a lei exige desativá-la.', fala: 'A barragem foi reforçada e ganhou sirenes. Isso diminui o risco, mas a solução definitiva é desativá-la.' },
+      { rotulo: 'Reaproveitar os rejeitos em tijolos e areia', custo: 240, ef: { social: 18, agua: 14, bio: 8, co2: -16 }, spr: 'reprocessamento', ic: ['ciclo', 'monte'], desc: 'A lama é seca e vira material de construção; a barragem é esvaziada e desativada.', fala: 'A lama virou tijolos e areia para a construção civil, e a barragem foi esvaziada e desativada.' },
+    ] },
+    'dados/diesel': { ic: ['servidor', 'bateria'], spr: 'bateriasDC', alt: [
+      { rotulo: 'Baterias de segunda vida, vindas de carros elétricos', custo: 80, requer: { cobertura: 0.5 }, ef: { co2: -36, social: 8, bio: 2 }, spr: 'bateriasSegundaVida', ic: ['bateria', 'ciclo'], desc: 'Baterias usadas de carros elétricos ainda guardam muita energia e ganham uma segunda vida.', fala: 'As baterias dos carros elétricos ganharam uma segunda vida guardando energia para o data center.' },
+      { rotulo: 'Células a combustível com hidrogênio verde', custo: 150, requer: { cobertura: 0.5 }, ef: { co2: -38, social: 8 }, spr: 'backupH2', ic: ['gota', 'servidor'], desc: 'Na falta de energia, o hidrogênio vira eletricidade e libera só vapor de água.', fala: 'Agora, se faltar energia, o hidrogênio verde mantém os servidores ligados, soltando só vapor de água.' },
+    ] },
+    'rede/carvao': { ic: ['fumaca', 'estrela'], spr: 'usinaDesmontada', alt: [
+      { rotulo: 'Instalar usina solar com baterias no terreno da termelétrica', custo: 120, requer: { horas24: true }, ef: { co2: -45, agua: 8, social: 8 }, spr: 'carvaoSolar', ic: ['sol', 'chave'], desc: 'A linha de transmissão da antiga usina é reaproveitada pelos painéis e pelas baterias.', fala: 'Onde havia carvão, agora há painéis e baterias, usando a mesma linha de transmissão.' },
+      { rotulo: 'Converter os geradores em compensadores síncronos', custo: 100, requer: { horas24: true }, ef: { co2: -45, agua: 6, social: 6 }, spr: 'compensador', ic: ['rede', 'chave'], desc: 'Sem queimar nada, os grandes geradores giram só para dar estabilidade a uma rede com muito sol e vento.', fala: 'Os geradores agora giram sem queimar carvão, só para manter a rede estável. Essa ideia já é usada em vários países.' },
+    ] },
+    'rede/nuclear': { ic: ['nuclear', 'proibido'], spr: 'nuclearDescomissionada', alt: [
+      { rotulo: 'Manter a usina até o fim da vida útil, com fiscalização', tipo: 'atencao', custo: 40, ef: { co2: 0, social: 2 }, spr: 'nuclearMonitorada', ic: ['nuclear', 'lupa'], desc: 'Não emite gás carbônico, mas o lixo radioativo e o risco de acidente continuam.', fala: 'A usina seguirá operando com fiscalização rigorosa até o fim da vida útil. O desafio do lixo radioativo continua.' },
+      { rotulo: 'Descomissionar e instalar painéis após a descontaminação', custo: 160, requer: { horas24: true }, ef: { co2: -10, agua: 10, social: 8 }, spr: 'nuclearSolar', ic: ['nuclear', 'sol'], desc: 'Depois de anos de descontaminação, o terreno recebe painéis e reaproveita a conexão com a rede.', fala: 'A usina será desmontada com segurança e, depois da descontaminação, o terreno receberá painéis solares.' },
+    ] },
+  };
+  MISSOES.forEach((ms) => ms.problemas.forEach((pb) => {
+    const sol = SOLUCOES[ms.id + '/' + pb.id];
+    if (!sol) { pb.alternativas = []; return; }
+    pb.acao.ic = sol.ic;
+    pb.acao.spr = sol.spr;
+    pb.acao.tipo = 'limpa';
+    pb.alternativas = sol.alt;
+  }));
+  // todas as soluções de um problema: a original primeiro
+  ERS.solucoes = (pb) => [Object.assign({ desc: pb.desc, fala: pb.fala }, pb.acao, { fala: pb.fala })].concat(pb.alternativas || []);
+  // índice da solução escolhida (true = a original, de jogos salvos antes)
+  ERS.solucaoEscolhida = (pb, valor) => (valor === true ? 0 : typeof valor === 'number' ? valor : -1);
+
+  // ---------- elenco de vozes (Azure AI Speech, pt-BR monolíngue) ----------
+  // Todas as vozes são neurais, humanas e do português do Brasil. Não há ajuste
+  // artificial de tom nem de timbre: só o ritmo acompanha a idade do personagem.
+  // Em cada missão, o narrador e os seis moradores falam com vozes diferentes,
+  // sempre do mesmo gênero do personagem.
+  const FEM = ['Francisca', 'Thalita', 'Brenda', 'Elza', 'Giovanna', 'Leila', 'Leticia', 'Manuela', 'Yara'];
+  const MASC = ['Antonio', 'Donato', 'Fabio', 'Humberto', 'Julio', 'Nicolau', 'Valerio'];
+  const NARRA = { iara: 'Francisca', luana: 'Thalita', rafael: 'Antonio', jandira: 'Elza', marina: 'Giovanna', caio: 'Humberto', bento: 'Valerio', tania: 'Leila', jaci: 'Yara', beatriz: 'Manuela', thiago: 'Julio', clara: 'Brenda' };
+  // vozes preferidas por idade (as demais do mesmo gênero completam a lista)
+  const PREF = {
+    F: { idoso: ['Elza', 'Leila', 'Yara', 'Manuela'], adulto: ['Manuela', 'Yara', 'Giovanna', 'Leila', 'Francisca', 'Brenda'], jovem: ['Leticia', 'Brenda', 'Giovanna', 'Thalita'] },
+    M: { idoso: ['Humberto', 'Valerio', 'Donato'], adulto: ['Donato', 'Julio', 'Fabio', 'Antonio', 'Nicolau'], jovem: ['Fabio', 'Nicolau', 'Julio'] },
+  };
+  const RITMO = { idoso: -5, adulto: 0, jovem: 4 };
+  const sinal = (v, u) => (v >= 0 ? '+' : '') + v + u;
+  const perfil = (nome, faixa, extra) => Object.assign({
+    azure: 'pt-BR-' + nome + 'Neural', vozAzure: nome, faixa,
+    edge: MASC.indexOf(nome) >= 0 ? 'pt-BR-AntonioNeural' : 'pt-BR-FranciscaNeural',
+    rate: sinal(RITMO[faixa] || 0, '%'), pitch: '+0Hz',
+    genero: MASC.indexOf(nome) >= 0 ? 'M' : 'F', tom: 1, ritmo: 1 + (RITMO[faixa] || 0) / 100,
+  }, extra || {});
+  // narradores: voz própria, sem repetir entre eles
+  const IDADE_NARRA = { jandira: 'idoso', caio: 'adulto', bento: 'idoso' };
+  Object.keys(NARRA).forEach((k) => { V[k] = perfil(NARRA[k], IDADE_NARRA[k] || 'adulto', { variante: 0 }); });
+  // moradores: escolha determinística, variando as vozes de uma missão para outra
+  const usoGlobal = {};
+  MISSOES.forEach((ms) => {
+    const usadas = new Set([V[ms.narrador.voz].vozAzure]);
+    ms.npcs.forEach((n, i) => {
+      const todas = n.g === 'M' ? MASC : FEM;
+      const pref = (PREF[n.g] && PREF[n.g][n.faixa]) || todas;
+      const ordem = pref.concat(todas.filter((x) => pref.indexOf(x) < 0));
+      const livres = ordem.filter((x) => !usadas.has(x));
+      // entre as preferidas livres, a menos usada até aqui
+      const candidatas = livres.filter((x) => pref.indexOf(x) >= 0);
+      const lista = candidatas.length ? candidatas : livres;
+      lista.sort((x, y) => (usoGlobal[x] || 0) - (usoGlobal[y] || 0) || ordem.indexOf(x) - ordem.indexOf(y));
+      const nome = lista[0];
+      if (!nome) throw new Error('Faltam vozes ' + n.g + ' para ' + ms.id);
+      usadas.add(nome); usoGlobal[nome] = (usoGlobal[nome] || 0) + 1;
+      const chave = 'morador_' + ms.id + '_' + i;
+      V[chave] = perfil(nome, n.faixa, { variante: i });
+      n.voz = chave;
+    });
   });
 
   // ---------- mapa central ----------

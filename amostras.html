@@ -1,0 +1,233 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Caderno de Obras de Vale Esperança</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lilita+One&family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&display=swap">
+<style>
+/* Layout: caderno de obras do município — missão > lote > cartões das opções, com filtros fixos no topo */
+:root {
+  --fundo: #eef3ee; --papel: #ffffff; --tinta: #1d2b26; --suave: #56665f; --borda: #d3ddd5;
+  --limpa: #23864a; --suja: #c4472f; --atencao: #b47a00; --acento: #1f6f8b; --chip: #e4ece6;
+  --display: 'Lilita One', 'Trebuchet MS', system-ui, sans-serif;
+  --texto: 'Atkinson Hyperlegible', system-ui, -apple-system, 'Segoe UI', sans-serif;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --fundo: #111a17; --papel: #18241f; --tinta: #e6efe9; --suave: #9fb2a8; --borda: #2b3b34;
+  --limpa: #4fcb7f; --suja: #ff8a6e; --atencao: #f2bf4a; --acento: #6cc3df; --chip: #22322b; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --fundo: #111a17; --papel: #18241f; --tinta: #e6efe9; --suave: #9fb2a8; --borda: #2b3b34;
+  --limpa: #4fcb7f; --suja: #ff8a6e; --atencao: #f2bf4a; --acento: #6cc3df; --chip: #22322b; color-scheme: dark }
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--fundo); color: var(--tinta); font: 16px/1.5 var(--texto); }
+.pagina { max-width: 1180px; margin: 0 auto; padding-inline: 16px; padding-block: 28px 64px; }
+h1, h2, h3 { font-family: var(--display); font-weight: 400; letter-spacing: 0.01em; text-wrap: balance; margin: 0; }
+h1 { font-size: clamp(1.9rem, 4vw, 2.6rem); line-height: 1.1; }
+h2 { font-size: 1.55rem; line-height: 1.15; }
+h3 { font-size: 1.08rem; line-height: 1.25; color: var(--suave); }
+.abre { display: grid; gap: 10px; max-width: 70ch; }
+.abre p { margin: 0; color: var(--suave); }
+.rotulo { font-size: 0.74rem; font-weight: 700; letter-spacing: 0.09em; text-transform: uppercase; color: var(--acento); }
+.numeros { display: flex; flex-wrap: wrap; gap: 8px 18px; font-size: 0.92rem; color: var(--suave); font-variant-numeric: tabular-nums; }
+.numeros b { color: var(--tinta); }
+.barra { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding-block: 12px; margin-block: 18px 6px; background: var(--fundo); border-bottom: 1px solid var(--borda); }
+.barra button, .barra select { font: 700 0.86rem var(--texto); color: var(--tinta); background: var(--papel); border: 1.5px solid var(--borda); border-radius: 999px; padding: 6px 13px; cursor: pointer; }
+.barra button[aria-pressed="true"] { background: var(--tinta); color: var(--fundo); border-color: var(--tinta); }
+.barra select { max-width: 100%; }
+.barra button:focus-visible, .barra select:focus-visible, .ouvir:focus-visible { outline: 3px solid var(--acento); outline-offset: 2px; }
+.missao { display: grid; gap: 18px; padding-block: 26px 8px; border-bottom: 1px solid var(--borda); }
+.missao > header { display: flex; flex-wrap: wrap; gap: 4px 16px; align-items: baseline; }
+.missao > header span { color: var(--suave); font-size: 0.92rem; }
+.lote { display: grid; gap: 10px; }
+.lote h3::before { content: 'Lote · '; color: var(--acento); }
+.grade { display: grid; grid-template-columns: repeat(auto-fill, minmax(232px, 1fr)); gap: 14px; }
+.cartao { position: relative; display: grid; grid-template-rows: auto auto auto 1fr auto; gap: 8px; min-width: 0; padding: 10px 10px 12px; background: var(--papel); border: 1.5px solid var(--borda); border-radius: 14px; }
+.cartao.suja { border-color: color-mix(in srgb, var(--suja) 45%, var(--borda)); }
+.cartao.atencao { border-color: color-mix(in srgb, var(--atencao) 45%, var(--borda)); }
+.cartao canvas { width: 100%; height: 132px; border-radius: 10px; display: block; }
+.cartao h4 { margin: 0; font-size: 1rem; line-height: 1.25; }
+.selo { justify-self: start; font-size: 0.7rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; padding: 2px 8px; border-radius: 999px; color: var(--papel); background: var(--limpa); }
+.selo.suja { background: var(--suja); } .selo.atencao { background: var(--atencao); }
+.efeitos { display: flex; flex-wrap: wrap; align-content: flex-start; align-items: flex-start; gap: 4px; }
+.efeitos span { font-size: 0.76rem; font-weight: 700; padding: 1px 7px; border-radius: 6px; background: var(--chip); font-variant-numeric: tabular-nums; }
+.efeitos .mais { color: var(--limpa); } .efeitos .menos { color: var(--suja); }
+.fala { display: grid; gap: 6px; margin: 0; padding-top: 8px; border-top: 1px dashed var(--borda); font-size: 0.86rem; color: var(--suave); }
+.fala q { quotes: '“' '”'; }
+.quem { font-size: 0.72rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--acento); }
+.ouvir { justify-self: start; display: inline-flex; align-items: center; gap: 6px; font: 700 0.8rem var(--texto); color: var(--papel); background: var(--acento); border: 0; border-radius: 999px; padding: 5px 12px; cursor: pointer; }
+.ouvir[disabled] { background: var(--chip); color: var(--suave); cursor: default; }
+/* ícone composto da construção */
+/* ícone composto: medalhão com relevo e símbolo menor no canto (o mesmo do jogo) */
+.ico-obra { --cor-obra: #23864a; position: absolute; top: 18px; left: 18px; display: grid; place-items: center; width: 46px; height: 46px; border-radius: 50%; color: #fff;
+  background: radial-gradient(circle at 32% 26%, color-mix(in srgb, var(--cor-obra) 55%, #fff) 0%, var(--cor-obra) 55%, color-mix(in srgb, var(--cor-obra) 70%, #000) 100%);
+  border: 2px solid #fff; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3), inset 0 -3px 6px rgba(0, 0, 0, 0.18), inset 0 2px 4px rgba(255, 255, 255, 0.35); }
+.ico-obra::after { content: ''; position: absolute; inset: 3px 9px auto 9px; height: 40%; border-radius: 50% 50% 45% 45%; background: linear-gradient(180deg, rgba(255, 255, 255, 0.42), rgba(255, 255, 255, 0)); pointer-events: none; }
+.ico-obra.suja { --cor-obra: #cf4a2f; } .ico-obra.atencao { --cor-obra: #d18f00; }
+.ico-obra > svg { width: 24px; height: 24px; filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.35)); }
+.ico-obra i { position: absolute; z-index: 1; right: -6px; bottom: -6px; display: grid; place-items: center; width: 23px; height: 23px; border-radius: 50%; background: radial-gradient(circle at 35% 30%, #fff, #eef2ee); color: var(--cor-obra); border: 2px solid var(--cor-obra); box-shadow: 0 2px 5px rgba(0, 0, 0, 0.3); }
+.ico-obra i svg { width: 13px; height: 13px; }
+.lote.problema h3::before { content: 'Problema · '; color: var(--suja); }
+.req { margin: 0; font-size: 0.8rem; font-weight: 700; color: var(--suave); }
+.vozes { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; }
+.voz { display: grid; gap: 6px; min-width: 0; padding: 12px 14px; background: var(--papel); border: 1.5px solid var(--borda); border-radius: 14px; }
+.voz p { margin: 0; font-size: 0.9rem; }
+.voz small { color: var(--suave); }
+.aviso { max-width: 70ch; padding: 10px 14px; border-radius: 12px; background: var(--chip); color: var(--suave); font-size: 0.9rem; }
+@media (prefers-reduced-motion: no-preference) { .cartao { transition: transform 0.15s ease; } .cartao:hover { transform: translateY(-2px); } }
+</style>
+</head>
+<body>
+<main class="pagina">
+  <div class="abre">
+    <span class="rotulo">Energias Renováveis e Sustentabilidade</span>
+    <h1>Caderno de Obras de Vale Esperança</h1>
+    <p>Todas as construções possíveis em cada lote das missões, incluindo os arranjos híbridos, e todas as soluções para os problemas ambientais. Cada possibilidade tem desenho e ícone próprios, efeitos e a fala que o narrador lê.</p>
+    <div class="numeros" id="numeros"></div>
+    <p class="aviso" id="aviso-audio" hidden>As falas aparecem em texto. O áudio com as vozes humanas fica disponível no site do jogo, depois que o GitHub gravar as vozes.</p>
+  </div>
+
+  <nav class="barra" aria-label="Filtros">
+    <button type="button" id="f-todas" data-f="todas" aria-pressed="true">Todas</button>
+    <button type="button" id="f-limpa" data-f="limpa" aria-pressed="false">Sustentáveis</button>
+    <button type="button" id="f-atencao" data-f="atencao" aria-pressed="false">Atenção ao local</button>
+    <button type="button" id="f-suja" data-f="suja" aria-pressed="false">Poluentes</button>
+    <select id="ir-missao" aria-label="Ir para a missão"><option value="">Ir para a missão…</option></select>
+  </nav>
+
+  <div id="obras"></div>
+
+  <section class="missao" id="vozes-personagens">
+    <header><h2>Vozes dos personagens</h2><span>Primeira fala de cada morador e narrador, com a voz neural pt-BR definida para ele</span></header>
+    <div class="vozes" id="vozes"></div>
+  </section>
+</main>
+
+<!--SCRIPTS-->
+<script src="audio/vozes/manifest.js"></script>
+<script src="js/nucleo.js"></script>
+<script src="js/audio.js"></script>
+<script src="js/sprites.js"></script>
+<script src="js/obras.js"></script>
+<script src="js/dados.js"></script>
+<script src="js/falas.js"></script>
+<!--/SCRIPTS-->
+<script>
+(function () {
+  'use strict';
+  const ERS = window.ERS, A = ERS.A, SPR = ERS.SPR;
+  const gravadas = window.ERS_VOZES || {};
+  const temAudio = Object.keys(gravadas).length > 0;
+  document.getElementById('aviso-audio').hidden = temAudio;
+  const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  const ROT = { limpa: 'Sustentável', suja: 'Poluente', atencao: 'Atenção ao local' };
+  const NOMES = { energia: ['Energia', ' MW'], co2: ['Emissões', ''], agua: ['Água', ''], bio: ['Biodiversidade', ''], social: ['Bem-estar', ''] };
+  const efeitos = (ef) => Object.keys(NOMES).filter((k) => ef[k]).map((k) => {
+    const v = ef[k], bom = k === 'co2' ? v < 0 : v > 0;
+    return `<span class="${bom ? 'mais' : 'menos'}">${NOMES[k][0]} ${v > 0 ? '+' : ''}${v}${NOMES[k][1]}</span>`;
+  }).join('');
+  const nomeVoz = (p) => (p.azure || p.edge || '').replace('pt-BR-', '').replace('Neural', '');
+  const primeiro = (n) => n.replace(/^(Dr\.|Dra\.|Profª|Prof\.|Dona|Seu)\s+/, '').split(' ')[0];
+  function idFala(texto, chave) { return A.idFala(A.limparTexto(texto), ERS.VOZES[chave]); }
+  function botaoOuvir(id) {
+    return gravadas[id]
+      ? `<button type="button" class="ouvir" data-id="${id}">▶ Ouvir</button>`
+      : `<button type="button" class="ouvir" disabled>Áudio ainda não gravado</button>`;
+  }
+
+  // ---------- construções ----------
+  const raiz = document.getElementById('obras');
+  const ir = document.getElementById('ir-missao');
+  let total = 0; const cont = { limpa: 0, suja: 0, atencao: 0 }; let lotes = 0;
+  const desenhar = [];
+  ERS.MISSOES.forEach((ms) => {
+    const sec = document.createElement('section');
+    sec.className = 'missao'; sec.id = 'm-' + ms.id;
+    sec.innerHTML = `<header><h2>${esc(ms.nome)}</h2><span>${esc(ms.fonte)} · narração de ${esc(ms.narrador.nome)} (${esc(nomeVoz(ERS.VOZES[ms.narrador.voz]))})</span></header>`;
+    ir.insertAdjacentHTML('beforeend', `<option value="m-${ms.id}">${esc(ms.nome)}</option>`);
+    ms.lotes.forEach((l) => {
+      lotes++;
+      const box = document.createElement('div'); box.className = 'lote';
+      box.innerHTML = `<h3>${esc(l.rotulo)}</h3>`;
+      const grade = document.createElement('div'); grade.className = 'grade';
+      l.opcoes.forEach((o) => {
+        const it = ERS.opcaoLote(o);
+        total++; cont[it.tipo]++;
+        const fala = ERS.falaItem(it);
+        const id = idFala(fala, ms.narrador.voz);
+        const card = document.createElement('article');
+        card.className = 'cartao ' + it.tipo; card.dataset.tipo = it.tipo;
+        card.innerHTML = `<canvas width="464" height="264" aria-label="Desenho de ${esc(it.nome)}" role="img"></canvas>${ERS.iconeObra(it)}` +
+          `<span class="selo ${it.tipo}">${ROT[it.tipo]}</span><h4>${esc(it.nome)}</h4><div class="efeitos">${efeitos(it.ef || {})}</div>` +
+          `<p class="fala"><span class="quem">${esc(primeiro(ms.narrador.nome))} lê</span><q>${esc(fala)}</q>${botaoOuvir(id)}</p>`;
+        grade.appendChild(card);
+        desenhar.push([card.querySelector('canvas'), it.spr, it.v || 0]);
+      });
+      box.appendChild(grade); sec.appendChild(box);
+    });
+    // soluções dos problemas ambientais
+    ms.problemas.forEach((pb) => {
+      const box = document.createElement('div'); box.className = 'lote problema';
+      box.innerHTML = `<h3>${esc(pb.nome)}</h3>`;
+      const grade = document.createElement('div'); grade.className = 'grade';
+      ERS.solucoes(pb).forEach((sol, k) => {
+        const tipo = sol.tipo || 'limpa';
+        total++; cont[tipo]++;
+        const fala = sol.fala || pb.fala;
+        const id = idFala(fala, ms.narrador.voz);
+        const req = sol.requer ? (sol.requer.horas24 ? 'Requer energia renovável nas 24 horas.' : 'Requer energia limpa de ' + Math.round(sol.requer.cobertura * 100) + '% da demanda.') : '';
+        const card = document.createElement('article');
+        card.className = 'cartao ' + tipo; card.dataset.tipo = tipo;
+        card.innerHTML = `<canvas width="464" height="264" aria-label="Desenho de ${esc(sol.rotulo)}" role="img"></canvas>${ERS.iconeObra(Object.assign({ tipo }, sol))}` +
+          `<span class="selo ${tipo}">${tipo === 'limpa' ? 'Solução completa' : 'Solução parcial'}</span><h4>${esc(sol.rotulo)}</h4><div class="efeitos">${efeitos(sol.ef || {})}<span>${sol.custo} créditos</span></div>` +
+          `${req ? `<p class="req">${req}</p>` : ''}<p class="fala"><span class="quem">${esc(primeiro(ms.narrador.nome))} lê</span><q>${esc(fala)}</q>${botaoOuvir(id)}</p>`;
+        grade.appendChild(card);
+        desenhar.push([card.querySelector('canvas'), sol.spr || pb.sprResolvido || pb.spr, 0]);
+      });
+      box.appendChild(grade); sec.appendChild(box);
+    });
+    raiz.appendChild(sec);
+  });
+  document.getElementById('numeros').innerHTML =
+    `<span><b>${total}</b> possibilidades</span><span><b>${lotes}</b> lotes</span><span><b>${cont.limpa}</b> sustentáveis</span><span><b>${cont.atencao}</b> com atenção ao local</span><span><b>${cont.suja}</b> poluentes</span>`;
+
+  const previa = (cv, spr, v) => SPR.previa(cv, spr, v);
+  // desenha aos poucos para não travar a página
+  let i = 0;
+  (function lote() { const fim = Math.min(i + 12, desenhar.length); for (; i < fim; i++) previa.apply(null, desenhar[i]); if (i < desenhar.length) requestAnimationFrame(lote); })();
+
+  // ---------- vozes dos personagens ----------
+  const vozes = document.getElementById('vozes');
+  function cartaoVoz(nome, papel, chave, texto, onde) {
+    const p = ERS.VOZES[chave]; const id = idFala(texto, chave);
+    const faixa = { idoso: 'mais velho(a)', adulto: 'adulto(a)', jovem: 'jovem' }[p.faixa] || 'narração';
+    return `<div class="voz"><span class="quem">${esc(onde)}</span><strong>${esc(nome)} <small>· ${esc(papel)}</small></strong>` +
+      `<small>Voz ${esc(nomeVoz(p))} · ${faixa}</small><p><q>${esc(texto)}</q></p>${botaoOuvir(id)}</div>`;
+  }
+  let html = cartaoVoz(ERS.HUB.narrador.nome, ERS.HUB.narrador.papel, ERS.HUB.narrador.voz, ERS.HUB.intro[0], ERS.HUB.nome);
+  ERS.MISSOES.forEach((m) => {
+    html += cartaoVoz(m.narrador.nome, m.narrador.papel, m.narrador.voz, m.intro[0], m.nome);
+    m.npcs.forEach((n) => { html += cartaoVoz(n.nome, n.papel, n.voz, n.fala, m.nome); });
+  });
+  vozes.innerHTML = html;
+
+  // ---------- interação ----------
+  let tocando = null;
+  document.addEventListener('click', (ev) => {
+    const b = ev.target.closest('.ouvir[data-id]'); if (!b) return;
+    if (tocando) { tocando.pause(); }
+    tocando = new Audio('audio/vozes/' + b.dataset.id + '.mp3'); tocando.play().catch(() => {});
+  });
+  document.querySelectorAll('.barra button').forEach((b) => b.addEventListener('click', () => {
+    document.querySelectorAll('.barra button').forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
+    const f = b.dataset.f;
+    document.querySelectorAll('.cartao').forEach((c) => { c.hidden = f !== 'todas' && c.dataset.tipo !== f; });
+    document.querySelectorAll('.lote').forEach((l) => { l.hidden = !l.querySelector('.cartao:not([hidden])'); });
+  }));
+  ir.addEventListener('change', () => { const el = document.getElementById(ir.value); if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' }); ir.value = ''; });
+})();
+</script>
+</body>
+</html>
