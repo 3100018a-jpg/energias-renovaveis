@@ -179,6 +179,8 @@ async def gerar_edge(item, edge_tts, ok, sem):
                 os.replace(tmp, destino(item))
                 return voz
             except Exception as e:
+                if os.path.exists(destino(item) + '.tmp'):
+                    os.remove(destino(item) + '.tmp')
                 espera = 2 ** tentativa + random.random()
                 print(f'  tentativa {tentativa + 1} falhou ({item["id"]}): {e}; nova tentativa em {espera:.0f}s')
                 await asyncio.sleep(espera)
@@ -222,6 +224,9 @@ async def main():
     except Exception:
         motores = {}
 
+    for nome in os.listdir(PASTA):
+        if nome.endswith('.tmp'):
+            os.remove(os.path.join(PASTA, nome))
     danificadas = [f for f in falas if os.path.exists(destino(f)) and not existe(f)]
     if danificadas:
         print(f'{len(danificadas)} gravações incompletas serão refeitas.')
@@ -254,8 +259,20 @@ async def main():
             sys.exit('Instale a biblioteca: pip install edge-tts')
         ok_vozes = await edge_disponiveis(edge_tts)
         print('Vozes pt-BR monolíngues disponíveis:', ', '.join(sorted(ok_vozes)))
+        # teste rápido: se o serviço não devolver áudio, não insiste por horas
+        teste = os.path.join(PASTA, '_teste.mp3')
+        try:
+            await asyncio.wait_for(edge_tts.Communicate('Olá, tudo bem?', 'pt-BR-FranciscaNeural').save(teste), 40)
+            servico_ok = os.path.getsize(teste) > 2000
+        except Exception as e:
+            print('Teste do serviço falhou:', e)
+            servico_ok = False
+        if os.path.exists(teste):
+            os.remove(teste)
+        if not servico_ok:
+            aviso('Serviço de vozes indisponível', 'O serviço gratuito de vozes da Microsoft não devolveu áudio. Nenhuma fala foi gravada agora; o jogo usa as vozes neurais do navegador (Microsoft Edge). Rode o fluxo de novo mais tarde.')
         # grava o que falta e regrava quando a voz própria do personagem passar a existir
-        pendentes = [f for f in falas if not existe(f) or motores.get(f['id']) != edge_resolver(f, ok_vozes)[0]]
+        pendentes = [f for f in falas if not existe(f) or motores.get(f['id']) != edge_resolver(f, ok_vozes)[0]] if servico_ok else []
         sem = asyncio.Semaphore(int(os.environ.get('PARALELO', '4')))
         fazer = lambda f: gerar_edge(f, edge_tts, ok_vozes, sem)
     else:
@@ -292,7 +309,7 @@ async def main():
     motores, ids = salvar_estado(falas, motores)
     provisorias = sum(1 for f in falas if f.get('azure') and motores.get(f['id']) != f['azure'])
     print(f'Concluído: {feitas} gravadas agora; {len(ids)} de {len(falas)} falas com áudio neural.')
-    if provisorias:
+    if provisorias and ids:
         print(f'{provisorias} falas usam a voz do mesmo gênero (a voz própria do personagem não está no serviço gratuito).')
 
 
