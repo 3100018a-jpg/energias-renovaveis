@@ -34,7 +34,7 @@ function linha(nome, papel, chave, texto) {
   const p = ERS.VOZES[chave];
   const id = idDe(texto, chave);
   if (!ids.has(id)) throw new Error('Fala de amostra não exportada: ' + nome);
-  const desc = p.azure ? nomeVoz(p) + ' · ' + (FAIXA[p.faixa] || '') : nomeVoz(p) + ' · narração';
+  const desc = (p.genero === 'M' ? 'personagem masculino' : 'personagem feminina') + ' · ' + (FAIXA[p.faixa] || 'narração');
   return `<li data-id="${id}" data-voz="${esc(p.azure || p.edge)}"><div class="q"><b>${esc(nome)}</b> <span>${esc(papel)}</span></div>` +
     `<div class="v">${esc(desc)} <em class="st"></em></div><p>${esc(texto)}</p>` +
     `<audio controls preload="none" src="audio/vozes/${id}.mp3"></audio></li>`;
@@ -64,7 +64,7 @@ p{margin:8px 0;font-size:.95rem}audio{width:100%;height:36px}
 a{color:inherit}
 </style></head><body><main>
 <h1>Vozes dos personagens</h1>
-<p class="intro">Cada morador fala com uma voz neural humana diferente, em português do Brasil, sem vozes multilíngues ou estrangeiras. A primeira fala de cada personagem está abaixo para ouvir.</p>
+<p class="intro">Vozes neurais da Microsoft em português do Brasil, sem vozes multilíngues ou estrangeiras e sem ajuste artificial de tom. A primeira fala de cada personagem está abaixo para ouvir, com a voz usada na gravação.</p>
 <p class="intro"><a href="./">Voltar ao jogo</a></p>
 ${corpo}
 </main>
@@ -73,8 +73,7 @@ fetch('audio/vozes/motores.json').then(function(r){return r.ok?r.json():{}}).cat
   document.querySelectorAll('li').forEach(function(li){
     var st=li.querySelector('.st'),feito=m[li.dataset.id];
     if(!feito){st.textContent='· ainda não gravada';st.className='st falta';}
-    else if(feito===li.dataset.voz){st.textContent='· voz definitiva';st.className='st ok';}
-    else{st.textContent='· voz provisória ('+feito.replace('pt-BR-','').replace('Neural','')+')';st.className='st prov';}
+    else{st.textContent='· gravada com a voz '+feito.replace('pt-BR-','').replace('Neural','');st.className='st ok';}
   });
 });
 </script>
