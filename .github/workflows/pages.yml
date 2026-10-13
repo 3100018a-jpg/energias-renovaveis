@@ -36,17 +36,22 @@ jobs:
       - name: Exportar falas do jogo
         run: node tools/exportar_falas.js
 
+      # Com os segredos AZURE_SPEECH_KEY e AZURE_SPEECH_REGION (Settings → Secrets and variables → Actions),
+      # cada personagem ganha uma voz humana própria do Azure. Sem eles, nenhuma voz é gravada.
       - name: Gerar vozes neurais pt-BR (somente as que faltam)
+        env:
+          AZURE_SPEECH_KEY: ${{ secrets.AZURE_SPEECH_KEY }}
+          AZURE_SPEECH_REGION: ${{ secrets.AZURE_SPEECH_REGION }}
         run: |
-          pip install edge-tts
           python tools/gerar_vozes.py
+        timeout-minutes: 150
         continue-on-error: true
 
       - name: Guardar as vozes no repositório
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898732+github-actions[bot]@users.noreply.github.com"
-          git add audio/
+          git add audio/ amostras-vozes.html
           git diff --cached --quiet || git commit -m "Vozes neurais pt-BR geradas automaticamente [skip ci]"
           git push || true
 
