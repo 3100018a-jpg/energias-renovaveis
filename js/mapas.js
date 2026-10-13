@@ -200,6 +200,8 @@
         const pimg = m.img(nx, ny);
         if (pimg[0] < 0.01 || pimg[0] > 0.99 || pimg[1] < 0.01 || pimg[1] > 0.99) continue;
         let c = 1, ag = 0;
+        // estradas novas não correm coladas às existentes (evita pistas duplas e "praças" de asfalto)
+        if (t !== T.ESTRADA && t !== T.PONTE && !alvo && D4.some((d) => { const q = [nx + d[0], ny + d[1]]; return (q[0] !== cx || q[1] !== cy) && ehVia(m, q[0], q[1]); })) c += 6;
         if (t === T.ESTRADA || t === T.PONTE) c = 0.35;
         else if (T.ehAgua(t)) {
           if (t !== T.RIO && t !== T.REJEITO) continue;
@@ -337,6 +339,66 @@
         aparar();
       });
       if (!mudou) return;
+    }
+  }
+  // afina trechos de asfalto com duas faixas de tiles (quadrados 2 × 2 de estrada):
+  // cada rua fica com a largura de um tile e os veículos seguem a pista, sem cortar na diagonal
+  function afinarVias(m) {
+    const N = m.N;
+    const nComp = () => componentes(m).tam.length;
+    // tirar o tile t não pode deixar duas estradas encostadas só pela quina
+    const deixaQuina = (t) => [[1, 1], [1, -1], [-1, 1], [-1, -1]].some((d) => ehVia(m, t[0] + d[0], t[1]) && ehVia(m, t[0], t[1] + d[1]) && !ehVia(m, t[0] + d[0], t[1] + d[1]));
+    const terreno = (x, y) => {
+      const viz = {};
+      for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) { const t = m.T(x + dx, y + dy); if (m.dentro(x + dx, y + dy) && !ehVia(m, x + dx, y + dy) && !T.ehAgua(t) && t !== T.URBANO && t !== T.PATIO) viz[t] = (viz[t] || 0) + 1; }
+      let best = T.GRAMA, bn = 0; Object.keys(viz).forEach((k) => { if (viz[k] > bn) { bn = viz[k]; best = +k; } });
+      return best;
+    };
+    for (let rodada = 0; rodada < 6; rodada++) {
+      let mudou = false;
+      for (let y = 0; y < N - 1; y++) for (let x = 0; x < N - 1; x++) {
+        const q = [[x, y], [x + 1, y], [x, y + 1], [x + 1, y + 1]];
+        if (!q.every((t) => ehVia(m, t[0], t[1]))) continue;
+        // remove o tile do quadrado com menos ligações para fora dele (nunca uma ponte)
+        const fora = (t) => D4.filter((d) => { const a = [t[0] + d[0], t[1] + d[1]]; return ehVia(m, a[0], a[1]) && !q.some((b) => b[0] === a[0] && b[1] === a[1]); }).length;
+        const ordem = q.filter((t) => m.T(t[0], t[1]) === T.ESTRADA).sort((a, b) => fora(a) - fora(b));
+        const antes = nComp();
+        for (const t of ordem) {
+          if (deixaQuina(t)) continue;
+          m.set(t[0], t[1], terreno(t[0], t[1]));
+          if (nComp() === antes) { mudou = true; break; }
+          m.set(t[0], t[1], T.ESTRADA);
+        }
+      }
+      if (!mudou) break;
+    }
+    // anéis minúsculos de estrada em volta de 1 a 3 tiles (ilhotas): abre o anel; as pontas
+    // que sobrarem são aparadas por resolverPontas
+    const visto = new Uint8Array(N * N);
+    for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
+      if (visto[m.i(x, y)] || ehVia(m, x, y) || T.ehAgua(m.T(x, y))) continue;
+      const reg = [[x, y]], fila = [[x, y]]; visto[m.i(x, y)] = 1;
+      let aberto = false;
+      while (fila.length && reg.length <= 3) {
+        const [cx, cy] = fila.pop();
+        D4.forEach((d) => {
+          const nx = cx + d[0], ny = cy + d[1];
+          if (!m.dentro(nx, ny)) { aberto = true; return; }
+          if (ehVia(m, nx, ny) || visto[m.i(nx, ny)]) return;
+          visto[m.i(nx, ny)] = 1; reg.push([nx, ny]); fila.push([nx, ny]);
+        });
+      }
+      if (aberto || fila.length || reg.length > 3) continue;
+      const borda = [];
+      reg.forEach((t) => D4.forEach((d) => { const q = [t[0] + d[0], t[1] + d[1]]; if (m.T(q[0], q[1]) === T.ESTRADA && !borda.some((b) => b[0] === q[0] && b[1] === q[1])) borda.push(q); }));
+      borda.sort((a2, b2) => grauVia(m, a2[0], a2[1]) - grauVia(m, b2[0], b2[1]));
+      const antes = nComp();
+      for (const t of borda) {
+        if (deixaQuina(t)) continue;
+        m.set(t[0], t[1], terreno(t[0], t[1]));
+        if (nComp() === antes) break;
+        m.set(t[0], t[1], T.ESTRADA);
+      }
     }
   }
   // corredor da estrada: o terreno ao lado acompanha o nível da pista (cortes e aterros
@@ -1629,7 +1691,9 @@
       if (!eh(x, y)) continue;
       [[1, 1], [1, -1], [-1, 1], [-1, -1]].forEach((d) => {
         if (!eh(x + d[0], y + d[1]) || eh(x + d[0], y) || eh(x, y + d[1])) return;
-        const opc = [[x + d[0], y], [x, y + d[1]]].filter((q) => livre(q[0], q[1]));
+        // prefere o tile que não forma um quadrado 2 × 2 de asfalto
+        const quadrado = (q) => [[0, 0], [-1, 0], [0, -1], [-1, -1]].some((o) => { const x0 = q[0] + o[0], y0 = q[1] + o[1]; return [[x0, y0], [x0 + 1, y0], [x0, y0 + 1], [x0 + 1, y0 + 1]].every((t) => (t[0] === q[0] && t[1] === q[1]) || eh(t[0], t[1])); });
+        const opc = [[x + d[0], y], [x, y + d[1]]].filter((q) => livre(q[0], q[1])).sort((a2, b2) => quadrado(a2) - quadrado(b2));
         if (opc.length) { const q = opc[0]; m.set(q[0], q[1], T.ESTRADA, Math.max(1, Math.min(m.H(x, y), m.H(x + d[0], y + d[1])))); }
       });
     }
@@ -1688,6 +1752,9 @@
     resolverPontas(m);
     conectarRede(m);
     resolverPontas(m);
+    for (let k = 0; k < 3; k++) { afinarVias(m); resolverPontas(m); }
+    acabarEstradas(m);
+    afinarVias(m); resolverPontas(m);
     acabarEstradas(m);
     nivelarCorredor(m);
     limpar(m);
