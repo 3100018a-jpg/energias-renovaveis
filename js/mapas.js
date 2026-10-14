@@ -105,8 +105,11 @@
   // assenta uma estrada sobre uma sequência de tiles vizinhos: cada travessia de rio vira
   // uma ponte reta, perpendicular a um dos eixos, com cabeceiras retas e alinhadas nos dois lados
   function assentar(m, cam) {
+    // a pista não passa por cima de construções: o trecho interrompido é religado depois
+    // por conectarRede, contornando a obra
+    const oc = mascaraOcupada(m);
     const put = (x, y) => {
-      if (!m.dentro(x, y)) return;
+      if (!m.dentro(x, y) || oc[m.i(x, y)]) return;
       const t = m.T(x, y);
       if (T.ehAgua(t)) m.set(x, y, T.PONTE, 1);
       else if (t !== T.PONTE) m.set(x, y, T.ESTRADA, Math.max(1, Math.min(m.H(x, y), 2)));
@@ -174,50 +177,92 @@
     }
     return { comp, tam };
   }
-  // caminho de menor custo por terra (rios viram pontes) entre um conjunto de origens e um alvo
+  // caminho de menor custo por terra (rios viram pontes) entre um conjunto de origens e um alvo.
+  // Cada travessia de água é reta, num só eixo, com a pista chegando e saindo em linha reta
+  // (cabeceiras alinhadas, nunca uma curva na ponta), e nada encosta de lado no tabuleiro.
+  // Estado da busca: tile × direção de chegada (0..3, ou 4 = origem) × "acabou de sair da água".
   function rotaEstrada(m, origens, ehAlvo, op) {
     op = op || {};
     const N = m.N, oc = op.oc || mascaraOcupada(m);
-    const custo = new Float32Array(N * N).fill(1e9), veio = new Int32Array(N * N).fill(-1), pAgua = new Uint8Array(N * N);
+    const NS = N * N * 10;
+    const st = (i, d, f) => (i * 5 + d) * 2 + f;
+    // Float64: com Float32, custos como 0,35 arredondam para baixo e a busca descartava o estado
+    const custo = new Float64Array(NS).fill(1e9), veio = new Int32Array(NS).fill(-1), pAgua = new Uint8Array(NS);
     const heap = [];
     const push = (i, f) => { heap.push([f, i]); let k = heap.length - 1; while (k > 0) { const p = (k - 1) >> 1; if (heap[p][0] <= heap[k][0]) break; [heap[p], heap[k]] = [heap[k], heap[p]]; k = p; } };
-    const pop = () => { const top = heap[0], u = heap.pop(); if (heap.length) { heap[0] = u; let k = 0; for (;;) { const a = 2 * k + 1, b = a + 1; let s = k; if (a < heap.length && heap[a][0] < heap[s][0]) s = a; if (b < heap.length && heap[b][0] < heap[s][0]) s = b; if (s === k) break; [heap[s], heap[k]] = [heap[k], heap[s]]; k = s; } } return top; };
-    origens.forEach((q) => { const i = m.i(q[0], q[1]); custo[i] = 0; push(i, 0); });
+    const pop = () => { const top = heap[0], u = heap.pop(); if (heap.length) { heap[0] = u; let k = 0; for (;;) { const a = 2 * k + 1, b = a + 1; let s2 = k; if (a < heap.length && heap[a][0] < heap[s2][0]) s2 = a; if (b < heap.length && heap[b][0] < heap[s2][0]) s2 = b; if (s2 === k) break; [heap[s2], heap[k]] = [heap[k], heap[s2]]; k = s2; } } return top; };
+    const PONTE_ = (x, y) => m.dentro(x, y) && m.T(x, y) === T.PONTE;
+    const aguaLivre = (x, y) => m.dentro(x, y) && T.ehAgua(m.T(x, y));
+    // eixo de uma ponte existente (0 = x, 1 = y), pelo vizinho de via
+    const eixoPonte = (x, y) => (ehVia(m, x - 1, y) || ehVia(m, x + 1, y) ? 0 : 1);
+    const eixoDe = (k) => (k < 2 ? 0 : 1);
+    origens.forEach((q) => {
+      const i = m.i(q[0], q[1]);
+      const ss = st(i, 4, 0); custo[ss] = 0; push(ss, 0);
+      // origem com estrada reta atrás: pode seguir direto para uma ponte
+      D4.forEach((d, k) => { if (ehVia(m, q[0] - d[0], q[1] - d[1])) { const s3 = st(i, k, 0); custo[s3] = 0; push(s3, 0); } });
+    });
     const limite = op.limite || 60;
     let achou = -1;
     while (heap.length) {
       const [cst, cur] = pop();
       if (cst > custo[cur]) continue;
       if (cst > limite) break;
-      const cx = cur % N, cy = (cur / N) | 0;
-      if (custo[cur] > 0 && ehAlvo(cx, cy)) { achou = cur; break; }
-      for (const d of D4) {
+      const fl = cur & 1, din = (cur >> 1) % 5, ti = ((cur >> 1) / 5) | 0;
+      const cx = ti % N, cy = (ti / N) | 0;
+      if (custo[cur] > 0 && ehAlvo(cx, cy) && !aguaLivre(cx, cy)) { achou = cur; break; }
+      const curAgua = aguaLivre(cx, cy);
+      for (let k = 0; k < 4; k++) {
+        const d = D4[k];
+        // na água e logo ao sair dela, a pista segue reta
+        if ((curAgua || fl) && k !== din) continue;
         const nx = cx + d[0], ny = cy + d[1];
         if (!m.dentro(nx, ny)) continue;
         const ni = m.i(nx, ny), t = m.tipo[ni];
         const alvo = ehAlvo(nx, ny);
         if (!alvo && (oc[ni] || (m.bloq[ni] && t !== T.ESTRADA && t !== T.PONTE))) continue;
+        // só por terreno novo (sem seguir estradas que já existem)
+        if (op.soNovo && !alvo && (t === T.ESTRADA || t === T.PONTE)) continue;
         const pimg = m.img(nx, ny);
         if (pimg[0] < 0.01 || pimg[0] > 0.99 || pimg[1] < 0.01 || pimg[1] > 0.99) continue;
-        let c = 1, ag = 0;
-        if (t === T.ESTRADA || t === T.PONTE) c = 0.35;
-        else if (T.ehAgua(t)) {
+        const perp = k < 2 ? [[0, 1], [0, -1]] : [[1, 0], [-1, 0]];
+        let c = 1, ag = 0, nfl = 0;
+        if (t === T.PONTE) {
+          // só se anda numa ponte existente ao longo do eixo dela
+          if (eixoPonte(nx, ny) !== eixoDe(k)) continue;
+          c = 0.35;
+        } else if (t === T.ESTRADA) {
+          if (curAgua) {
+            nfl = 1;
+            // chegando à rede existente: a estrada de lá precisa continuar reta (a ponte não termina numa curva)
+            if (!ehVia(m, nx + d[0], ny + d[1])) continue;
+          }
+          c = 0.35;
+        } else if (T.ehAgua(t)) {
           if (t !== T.RIO && t !== T.REJEITO) continue;
+          // entrar na água só em linha reta com o tile anterior
+          if (!curAgua && din !== k) continue;
+          // nada de via encostada nas laterais do vão
+          if (perp.some((p) => ehVia(m, nx + p[0], ny + p[1]))) continue;
           c = 6; ag = pAgua[cur] + 1;
           if (ag > (op.maxAgua || 7)) continue;
         } else {
           if (t === T.LAVA || !T.props[t].andavel) continue;
+          // pista nova não encosta numa ponte
+          if (D4.some((dd) => PONTE_(nx + dd[0], ny + dd[1]))) continue;
+          if (curAgua) nfl = 1;
           if (t === T.FLORESTA) c = 2.2; else if (t === T.ROCHA || t === T.MINA || t === T.ESTERIL || t === T.BASALTO) c = 3; else if (t === T.CANA || t === T.QUEIMADO || t === T.CINZA_VULC) c = 1.4;
-          const dh = Math.abs(m.alt[ni] - m.alt[cur]);
-          if (!T.ehAgua(m.tipo[cur]) && dh > 1) c += (dh - 1) * 5;
+          const dh = Math.abs(m.alt[ni] - m.alt[ti]);
+          if (!curAgua && dh > 1) c += (dh - 1) * 5;
         }
+        const ns = st(ni, k, nfl);
         const nc = cst + c;
-        if (nc < custo[ni]) { custo[ni] = nc; veio[ni] = cur; pAgua[ni] = ag; push(ni, nc); }
+        if (nc < custo[ns]) { custo[ns] = nc; veio[ns] = cur; pAgua[ns] = ag; push(ns, nc); }
       }
     }
     if (achou < 0) return null;
     const cam = [];
-    for (let k = achou; k >= 0; k = veio[k]) { cam.push([k % N, (k / N) | 0]); if (custo[k] === 0) break; }
+    for (let k = achou; k >= 0; k = veio[k]) { const ti = ((k >> 1) / 5) | 0; cam.push([ti % N, (ti / N) | 0]); if (custo[k] === 0) break; }
     return cam.reverse();
   }
   // liga ao núcleo principal (a cidade) os trechos de estrada que ficaram soltos
@@ -268,7 +313,8 @@
   }
   // cada ponta sem saída: ou leva a algum lugar, ou sai do mapa, ou fecha um anel, ou ganha
   // um destino (sítio, galpão, posto, mirante...), ou é removida
-  function resolverPontas(m) {
+  function resolverPontas(m, op) {
+    op = op || {};
     const N = m.N;
     const r = U.rng(m.seed + 91);
     for (let rodada = 0; rodada < 3; rodada++) {
@@ -316,11 +362,11 @@
           const perto = new Set();
           const fila = [[x, y, 0]]; perto.add(m.i(x, y));
           while (fila.length) { const [cx, cy, k] = fila.shift(); if (k >= 14) continue; D4.forEach((dd) => { const nx = cx + dd[0], ny = cy + dd[1]; if (ehVia(m, nx, ny) && !perto.has(m.i(nx, ny))) { perto.add(m.i(nx, ny)); fila.push([nx, ny, k + 1]); } }); }
-          const cam = rotaEstrada(m, [[x, y]], (ax, ay) => ehVia(m, ax, ay) && !perto.has(m.i(ax, ay)), { limite: 16, oc, maxAgua: 5 });
-          if (cam && cam.length > 2 && cam.length <= 16) { assentar(m, cam); mudou = true; return; }
+          const cam = rotaEstrada(m, [[x, y]], (ax, ay) => ehVia(m, ax, ay) && !perto.has(m.i(ax, ay)), { limite: 16, oc, maxAgua: 5, soNovo: true });
+          if (cam && cam.length > 2 && cam.length <= 16 && cam.some((q) => !ehVia(m, q[0], q[1]))) { assentar(m, cam); mudou = true; return; }
         }
         // c) um destino no fim da estrada
-        {
+        if (!op.semDestino) {
           const lista = DESTINOS[contextoPonta(m, x, y)];
           const cand = [[x + d[0], y + d[1]], [x + d[1], y + d[0]], [x - d[1], y - d[0]]];
           for (const q of cand) {
@@ -370,8 +416,27 @@
       });
     }
   }
+  // pegada sobre estrada ou ponte?
+  function sobreVia(m, x, y, w, d) {
+    for (let j = 0; j < d; j++) for (let i = 0; i < w; i++) { const t = m.T(x + i, y + j); if (t === T.ESTRADA || t === T.PONTE) return true; }
+    return false;
+  }
   function ed(m, spr, x, y, fp, v, extra) {
     fp = fp || [1, 1];
+    // construções nunca ficam em cima da pista: vão para o terreno livre mais próximo
+    if (sobreVia(m, x, y, fp[0], fp[1])) {
+      let achou = null;
+      for (let r = 1; r <= 5 && !achou; r++) for (let dy = -r; dy <= r && !achou; dy++) for (let dx = -r; dx <= r && !achou; dx++) {
+        if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue;
+        const nx = x + dx, ny = y + dy;
+        if (!m.livre(nx, ny, fp[0], fp[1]) || sobreVia(m, nx, ny, fp[0], fp[1])) continue;
+        let plano = true;
+        for (let j = 0; j < fp[1]; j++) for (let i = 0; i < fp[0]; i++) if (T.ehAgua(m.T(nx + i, ny + j)) || m.T(nx + i, ny + j) === T.LAVA || Math.abs(m.H(nx + i, ny + j) - m.H(nx, ny)) > 1) plano = false;
+        if (plano) achou = [nx, ny];
+      }
+      if (!achou) return null;
+      x = achou[0]; y = achou[1];
+    }
     if (!m.livre(x, y, fp[0], fp[1])) return null;
     const h = Math.max(1, m.H(x, y));
     m.nivelar(x, y, fp[0], fp[1], h);
@@ -858,8 +923,13 @@
   function linhaTransmissao(m, pts) {
     const tps = [];
     for (let i = 0; i < pts.length; i++) {
-      const t = m.tile(pts[i][0], pts[i][1]);
-      if (m.livre(t[0], t[1], 1, 1)) { m.ocupar(t[0], t[1], 1, 1); deco(m, 'torreLinha', t[0], t[1], 0, { fp: [1, 1], bloqueia: true }); tps.push(t); }
+      let t = m.tile(pts[i][0], pts[i][1]);
+      // torre nunca sobre a pista: vai para o lado
+      if (sobreVia(m, t[0], t[1], 1, 1)) {
+        const viz = [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [-1, -1], [1, -1], [-1, 1], [2, 0], [-2, 0], [0, 2], [0, -2]].map((d) => [t[0] + d[0], t[1] + d[1]]);
+        t = viz.find((q) => m.livre(q[0], q[1], 1, 1) && !sobreVia(m, q[0], q[1], 1, 1) && !T.ehAgua(m.T(q[0], q[1]))) || t;
+      }
+      if (m.livre(t[0], t[1], 1, 1) && !sobreVia(m, t[0], t[1], 1, 1)) { m.ocupar(t[0], t[1], 1, 1); deco(m, 'torreLinha', t[0], t[1], 0, { fp: [1, 1], bloqueia: true }); tps.push(t); }
     }
     m.linhas = m.linhas || [];
     m.linhas.push(tps);
@@ -1652,6 +1722,103 @@
     return mudou;
   }
 
+  // ---------- revisão final da malha viária ----------
+  // ponte boa: reta num só eixo, nada encostado de lado no tabuleiro, e as duas cabeceiras
+  // são estrada que continua reta (nunca uma curva logo na ponta da ponte)
+  function pontesRuins(m) {
+    const N = m.N, visto = new Uint8Array(N * N), ruins = [];
+    for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
+      if (m.T(x, y) !== T.PONTE || visto[m.i(x, y)]) continue;
+      const comp = [], fila = [[x, y]]; visto[m.i(x, y)] = 1;
+      while (fila.length) { const q = fila.pop(); comp.push(q); D4.forEach((d) => { const nx = q[0] + d[0], ny = q[1] + d[1]; if (m.dentro(nx, ny) && m.T(nx, ny) === T.PONTE && !visto[m.i(nx, ny)]) { visto[m.i(nx, ny)] = 1; fila.push([nx, ny]); } }); }
+      let ok = true;
+      const mesmoY = comp.every((q) => q[1] === comp[0][1]), mesmoX = comp.every((q) => q[0] === comp[0][0]);
+      let eixo = -1;
+      if (comp.length > 1) eixo = mesmoY ? 0 : mesmoX ? 1 : -1;
+      else eixo = ehVia(m, x - 1, y) && ehVia(m, x + 1, y) ? 0 : ehVia(m, x, y - 1) && ehVia(m, x, y + 1) ? 1 : -1;
+      if (eixo < 0) ok = false;
+      else {
+        const st = eixo === 0 ? [1, 0] : [0, 1], pp = eixo === 0 ? [0, 1] : [1, 0];
+        comp.forEach((q) => { if (ehVia(m, q[0] + pp[0], q[1] + pp[1]) || ehVia(m, q[0] - pp[0], q[1] - pp[1])) ok = false; });
+        comp.sort((a, b) => a[0] + a[1] - b[0] - b[1]);
+        const a0 = comp[0], a1 = comp[comp.length - 1];
+        [[a0[0] - st[0], a0[1] - st[1], -1], [a1[0] + st[0], a1[1] + st[1], 1]].forEach(([hx, hy, s2]) => {
+          if (!m.dentro(hx, hy) || m.T(hx, hy) !== T.ESTRADA) { ok = false; return; }
+          if (!ehVia(m, hx + st[0] * s2, hy + st[1] * s2)) ok = false;
+        });
+      }
+      if (!ok) ruins.push(comp);
+    }
+    return ruins;
+  }
+  // desfaz uma ponte: volta a água que havia embaixo, e recolhe as pontas de estrada que
+  // ficaram coladas na margem (abre espaço para uma travessia nova, reta)
+  function desfazerPonte(m, comp) {
+    const cabeceiras = [];
+    comp.forEach(([x, y]) => D4.forEach((d) => { const nx = x + d[0], ny = y + d[1]; if (m.dentro(nx, ny) && m.T(nx, ny) === T.ESTRADA) cabeceiras.push([nx, ny]); }));
+    comp.forEach(([x, y]) => {
+      const sob = m.aguaSob ? m.aguaSob[m.i(x, y)] : 255;
+      let h = 0;
+      D4.forEach((d) => { const t = m.T(x + d[0], y + d[1]); if (m.dentro(x + d[0], y + d[1]) && T.ehAgua(t)) h = Math.min(h, m.H(x + d[0], y + d[1])); });
+      m.set(x, y, sob === 255 || sob === undefined ? T.RIO : sob, h);
+    });
+    const pertoAgua = (x, y) => { for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) if (m.dentro(x + dx, y + dy) && T.ehAgua(m.T(x + dx, y + dy))) return true; return false; };
+    cabeceiras.forEach((c) => {
+      let cur = c;
+      for (let k = 0; k < 5 && cur; k++) {
+        if (m.T(cur[0], cur[1]) !== T.ESTRADA || grauVia(m, cur[0], cur[1]) > 1 || !pertoAgua(cur[0], cur[1])) break;
+        const prox = D4.map((d) => [cur[0] + d[0], cur[1] + d[1]]).find((q) => ehVia(m, q[0], q[1]));
+        viraChao(m, cur[0], cur[1]);
+        cur = prox;
+      }
+    });
+  }
+  // terreno do entorno para um tile de estrada que sai
+  function viraChao(m, x, y) {
+    const viz = {};
+    D4.forEach((dd) => { const nx = x + dd[0], ny = y + dd[1]; if (!m.dentro(nx, ny)) return; const t = m.T(nx, ny); if (!ehVia(m, nx, ny) && !T.ehAgua(t) && t !== T.LAVA) viz[t] = (viz[t] || 0) + 1; });
+    let best = T.GRAMA, bn = 0; Object.keys(viz).forEach((k) => { if (viz[k] > bn) { bn = viz[k]; best = +k; } });
+    m.set(x, y, best);
+  }
+  // tira os "anéis" 2×2 de pista (ilhota sem função) e as pontas que só se tocam pela quina
+  function limparMalha(m) {
+    const N = m.N;
+    let mudou = false;
+    const est = (x, y) => m.dentro(x, y) && m.T(x, y) === T.ESTRADA;
+    for (let y = 0; y < N - 1; y++) for (let x = 0; x < N - 1; x++) {
+      const q = [[x, y], [x + 1, y], [x, y + 1], [x + 1, y + 1]];
+      if (!q.every((t) => est(t[0], t[1]))) continue;
+      // remove o canto que não leva a lugar nenhum fora do quadrado
+      const fora = (t) => D4.filter((d) => { const nx = t[0] + d[0], ny = t[1] + d[1]; return ehVia(m, nx, ny) && !(nx >= x && nx <= x + 1 && ny >= y && ny <= y + 1); }).length;
+      const c = q.find((t) => fora(t) === 0);
+      if (c) { viraChao(m, c[0], c[1]); mudou = true; }
+    }
+    for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
+      if (!est(x, y)) continue;
+      [[1, 1], [1, -1], [-1, 1], [-1, -1]].forEach((d) => {
+        if (!est(x, y) || !ehVia(m, x + d[0], y + d[1]) || ehVia(m, x + d[0], y) || ehVia(m, x, y + d[1])) return;
+        if (grauVia(m, x, y) <= 1) { viraChao(m, x, y); mudou = true; }
+      });
+    }
+    return mudou;
+  }
+  function revisarMalha(m) {
+    for (let it = 0; it < 5; it++) {
+      let mudou = limparMalha(m);
+      const ruins = pontesRuins(m);
+      ruins.forEach((c) => desfazerPonte(m, c));
+      if (ruins.length) mudou = true;
+      if (!mudou) return;
+      conectarRede(m);
+      resolverPontas(m);
+      acabarEstradas(m);
+    }
+    // o que ainda restar de ponte torta sai do mapa (melhor sem ponte do que uma ponte errada)
+    pontesRuins(m).forEach((c) => desfazerPonte(m, c));
+    resolverPontas(m);
+    limparMalha(m);
+  }
+
   // construções extras de cada lugar (casas, comércio, sítios), em terrenos livres
   const EXTRAS = {
     solar: ['casaSolar', 'casaSolar', 'predioSolar', 'aquecedorSolar', 'carregadorVE', 'quiosque', 'casa', 'praca'],
@@ -1689,10 +1856,20 @@
     conectarRede(m);
     resolverPontas(m);
     acabarEstradas(m);
+    revisarMalha(m);
     nivelarCorredor(m);
     limpar(m);
     if (EXTRAS[id]) povoar(m, EXTRAS[id]);
     garantirAcesso(m);
+    // se o acesso a algum ponto do jogo tirou a construção do fim de uma estrada, a ponta
+    // é ligada a outra via, levada até a borda ou recolhida (sem criar obra nova no caminho)
+    for (let k = 0; k < 3; k++) {
+      limparMalha(m);
+      resolverPontas(m, { semDestino: true });
+      const ruins = pontesRuins(m);
+      if (!ruins.length) break;
+      ruins.forEach((c) => desfazerPonte(m, c));
+    }
     return m;
   };
 })();

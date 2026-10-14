@@ -144,14 +144,25 @@ input[type="range"] { width: 100%; accent-color: var(--ouro); }
 .indice p { margin: 0; font-size: 0.82rem; color: var(--texto-suave); line-height: 1.3; }
 .indice strong { display: block; color: var(--texto); font-size: 0.95rem; }
 @media (max-width: 720px) {
-  #painel-missao { top: auto; bottom: 10px; left: 10px; width: min(300px, calc(100% - 20px)); max-height: 46%; }
+  /* deixa o canto inferior direito livre para o minimapa (≈147px de largura) */
+  #painel-missao { top: auto; bottom: max(10px, env(safe-area-inset-bottom)); left: 10px; width: min(300px, calc(100% - 177px)); max-height: 46%; }
+  /* painel mais estreito: rótulo e valor dos indicadores em linhas separadas, sem cortar */
+  .ind { grid-template-columns: 1fr; }
+  .indice { flex-direction: column; align-items: flex-start; }
+  .indice p { overflow-wrap: anywhere; }
 }
 
 /* ---------- minimapa ---------- */
 #caixa-minimapa { position: fixed; z-index: 15; right: 14px; bottom: 14px; padding: 8px; border-radius: 16px; background: var(--painel); border: 1.5px solid var(--borda); display: grid; grid-template-columns: auto auto; gap: 8px; align-items: end; backdrop-filter: blur(8px); }
 #minimapa { width: 200px; height: auto; border-radius: 10px; cursor: crosshair; display: block; }
 .zoom { display: grid; gap: 6px; }
-@media (max-width: 720px) { #minimapa { width: 130px; } #caixa-minimapa { bottom: auto; top: 128px; } }
+/* celular (retrato ou paisagem): minimapa compacto no canto inferior direito, longe do personagem */
+@media (max-width: 720px), (pointer: coarse) and (max-height: 520px) {
+  #caixa-minimapa { top: auto; right: max(10px, env(safe-area-inset-right)); bottom: max(10px, env(safe-area-inset-bottom)); padding: 6px; gap: 6px; border-radius: 14px; grid-template-columns: auto; }
+  #minimapa { width: 132px; border-radius: 8px; }
+  #caixa-minimapa .zoom { order: -1; display: flex; justify-content: space-between; }
+  #caixa-minimapa .bt-ico.peq { width: 38px; height: 32px; }
+}
 
 #dica-hover { position: fixed; z-index: 30; pointer-events: none; padding: 6px 10px; border-radius: 10px; background: rgba(5, 25, 32, 0.92); border: 1px solid var(--borda); font-size: 0.85rem; font-weight: 700; transform: translate(14px, 14px); white-space: nowrap; }
 #dica-hover small { display: block; font-weight: 400; color: var(--texto-suave); }

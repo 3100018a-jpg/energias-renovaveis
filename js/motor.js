@@ -962,14 +962,14 @@
     const nv = Math.round(Math.min(estradas.length / 9, 46) * cfg.veiculos);
     const ocupados = new Set();
     for (let i = 0; i < nv && estradas.length > 2; i++) {
-      // cada veículo nasce num trecho diferente, longe dos outros
+      // só carros circulam (sem ônibus nem caminhões); cada um nasce num trecho diferente, longe dos outros
       let p = null;
       for (let k = 0; k < 12 && !p; k++) { const q = r.pick(estradas); if (!ocupados.has(q[1] * m.N + q[0])) p = q; }
       if (!p) continue;
       for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) ocupados.add((p[1] + dy) * m.N + p[0] + dx);
       // mapas podem dispensar veículos de certa cor (ex.: carro azul em zigue-zague nos canaviais)
       if (m.semCorVeiculo && CORES[i % CORES.length] === m.semCorVeiculo) continue;
-      const v0 = { x: p[0], y: p[1], px: p[0], py: p[1], nx: p[0], ny: p[1], nnx: p[0], nny: p[1], t: 0, vel: r.range(1.2, 2.2), cor: CORES[i % CORES.length], tipo: r() < 0.15 ? 'onibus' : r() < 0.25 ? 'caminhao' : 'carro' };
+      const v0 = { x: p[0], y: p[1], px: p[0], py: p[1], nx: p[0], ny: p[1], nnx: p[0], nny: p[1], t: 0, vel: r.range(1.2, 2.2), cor: CORES[i % CORES.length], tipo: 'carro', hx: 1, hy: 0 };
       const b0 = vizEstrada(p[0], p[1]); if (b0.length) { const b = r.pick(b0); v0.nx = b[0]; v0.ny = b[1]; const c0 = vizEstrada(b[0], b[1]).filter((q) => q[0] !== p[0] || q[1] !== p[1]); const cc = c0.length ? r.pick(c0) : p; v0.nnx = cc[0]; v0.nny = cc[1]; }
       posVeiculo(v0);
       M.veiculos.push(v0);
@@ -1225,7 +1225,7 @@
       }
     }
     const d = Math.hypot(hx || 0, hy || 0);
-    if (d > 1e-4) { hx /= d; hy /= d; v.hx = hx; v.hy = hy; } else { hx = v.hx || 1; hy = v.hy || 0; }
+    if (d > 1e-4) { hx /= d; hy /= d; v.hx = hx; v.hy = hy; } else { hx = v.hx; hy = v.hy; }
     v.fx = a[0] - hy * 0.11; v.fy = a[1] + hx * 0.11;
     v.th = M.mapa.H(a[2], a[3]);
   }
@@ -1237,7 +1237,7 @@
     const V = M.veiculos;
     for (let i = 0; i < V.length; i++) {
       const v = V[i];
-      const hx = v.hx || 1, hy = v.hy || 0;
+      const hx = v.hx, hy = v.hy;
       let livre = 1;
       for (let k = 0; k < V.length; k++) {
         if (k === i) continue;
@@ -1245,7 +1245,7 @@
         const dx = u.fx - v.fx, dy = u.fy - v.fy;
         if (dx * dx + dy * dy > 0.7) continue;
         const frente = dx * hx + dy * hy, lado = Math.abs(dx * hy - dy * hx);
-        const mesmoSentido = (u.hx || 1) * hx + (u.hy || 0) * hy;
+        const mesmoSentido = u.hx * hx + u.hy * hy;
         const folga = (v.tipo === 'carro' ? 0.5 : 0.62) + (u.tipo === 'carro' ? 0 : 0.12);
         if (frente > 0.02 && frente < folga && lado < 0.15 && mesmoSentido > 0.3) livre = Math.min(livre, Math.max(0, (frente - 0.34) / (folga - 0.34)));
         else if (frente > 0.05 && frente < 0.5 && lado < 0.3 && Math.abs(mesmoSentido) < 0.5 && k < i) livre = 0;
@@ -1633,7 +1633,7 @@
       M.veiculos.forEach((v) => {
         const w = M.pontoMundo(v.fx, v.fy, v.th);
         if (w[0] < vis[0] - 30 || w[0] > vis[2] + 30 || w[1] < vis[1] - 30 || w[1] > vis[3] + 30) return;
-        const d = M.pontoMundo(v.hx || 1, v.hy || 0, 0);
+        const d = M.pontoMundo(v.hx, v.hy, 0);
         c.globalAlpha = 0.55 * L; c.drawImage(brilhoSprite('#fff4c0'), w[0] + d[0] * 0.45 - 12, w[1] + d[1] * 0.45 - 8, 24, 16);
       });
       // 5) fogo, lava e farol
@@ -1695,7 +1695,8 @@
   // faróis brancos na frente, lanternas vermelhas atrás e rodas nas laterais.
   function desenharVeiculo(c, e) {
     const v = e._veic;
-    const hx = v.hx || 1, hy = v.hy || 0, nx = -hy, ny = hx;
+    // direção da pista (hx = 0 é válido: andando no eixo norte–sul)
+    const hx = v.hx, hy = v.hy, nx = -hy, ny = hx;
     const P = SPR.P;
     const loc = (a, b) => [hx * a + nx * b, hy * a + ny * b];
     // retângulo no referencial do veículo: a = ao longo da pista (frente +), b = lateral (direita +)
